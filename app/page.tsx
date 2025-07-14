@@ -1,10 +1,10 @@
-'use client';
+"use client";
 
-import NewsList from '../components/news/NewsList';
+import NewsList from "../components/news/NewsList";
 
 export default function HomePage() {
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div>
       <NewsList />
     </div>
   );

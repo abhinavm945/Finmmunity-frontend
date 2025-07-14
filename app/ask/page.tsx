@@ -1,5 +1,10 @@
-import QuestionList from '../../components/ask/QuestionList';
+import QuestionList from "../../components/ask/QuestionList";
+import ProtectedRoute from "../../components/shared/ProtectedRoute";
 
 export default function AskPage() {
-  return <QuestionList />;
+  return (
+    <ProtectedRoute>
+      <QuestionList />
+    </ProtectedRoute>
+  );
 }

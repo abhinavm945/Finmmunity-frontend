@@ -1,65 +1,141 @@
-'use client';
+"use client";
 
-import { useState } from 'react';
-import { FiSend } from 'react-icons/fi';
-import useQuestionForm from '../../hooks/ask/useQuestionForm';
+import { useState, useEffect } from "react";
+import { api } from "../../utils/api";
 
 interface QuestionFormProps {
-  setQuestions: (questions: any[]) => void;
-  questions: any[];
+  onClose: () => void;
+  questionToEdit?: Question; // If present, form is in edit mode
 }
 
-export default function QuestionForm({ setQuestions, questions }: QuestionFormProps) {
-  const { newQuestion, setNewQuestion, handleSubmitQuestion } = useQuestionForm();
+export default function QuestionForm({
+  onClose,
+  questionToEdit,
+}: QuestionFormProps) {
+  const [title, setTitle] = useState(questionToEdit?.title || "");
+  const [content, setContent] = useState(questionToEdit?.body || "");
+  const [category, setCategory] = useState(
+    questionToEdit?.category || "investment"
+  );
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
 
-  const categories = [
-    { id: 'all', name: 'All Questions' },
-    { id: 'crypto', name: 'Crypto' },
-    { id: 'stocks', name: 'Stocks' },
-    { id: 'etfs', name: 'ETFs' },
-    { id: 'economy', name: 'Economy' },
-    { id: 'education', name: 'Education' },
-    { id: 'strategies', name: 'Strategies' },
-  ];
+  useEffect(() => {
+    const fetchCategories = async () => {
+      try {
+        const response = await api.questions.getCategories();
+        if (response.success && response.data) {
+          setCategories(response.data as Category[]);
+        } else {
+          setCategories([]);
+        }
+      } catch (error) {
+        console.error("Error fetching categories:", error);
+        setCategories([]);
+      }
+    };
+    fetchCategories();
+  }, []);
 
-  const onSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    handleSubmitQuestion(questions, setQuestions);
+    setLoading(true);
+    setError("");
+    try {
+      const questionData = {
+        title,
+        body: content,
+        category,
+      };
+
+      let response;
+      if (questionToEdit) {
+        response = await api.questions.updateQuestion(
+          questionToEdit.id,
+          questionData
+        );
+      } else {
+        response = await api.questions.createQuestion(questionData);
+      }
+
+      if (response.success) {
+        onClose();
+      } else {
+        setError(response.error?.message || "Failed to save question.");
+      }
+    } catch (error) {
+      setError((error as Error).message || "Failed to save question.");
+      console.error("Error saving question:", error);
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
-    <div className="bg-white rounded-lg shadow-sm p-6 mb-6 border border-gray-200">
-      <h2 className="text-xl font-semibold text-gray-800 mb-4">Ask the Community</h2>
-      <form onSubmit={onSubmit}>
-        <div className="relative">
-          <input
-            type="text"
-            value={newQuestion}
-            onChange={(e) => setNewQuestion(e.target.value)}
-            placeholder="What's your financial question?"
-            className="w-full pl-4 pr-12 py-2 rounded-lg border border-gray-200 focus:ring-2 focus:ring-blue-400 focus:border-transparent text-sm"
-          />
-          <button
-            type="submit"
-            className="absolute right-2 top-1/2 transform -translate-y-1/2 bg-gradient-to-r from-blue-500 to-purple-500 text-white p-2 rounded-full hover:shadow-lg transition-all"
-          >
-            <FiSend size={16} />
-          </button>
-        </div>
-        <div className="mt-3 flex flex-wrap gap-2">
-          <span className="text-xs text-gray-500">Suggested: </span>
-          {categories.slice(1, 5).map((cat) => (
-            <button
-              key={cat.id}
-              type="button"
-              className="text-xs px-3 py-1 bg-gray-100 rounded-full text-gray-700 hover:bg-gray-200"
-              onClick={() => setNewQuestion(`${newQuestion} ${cat.name} `)}
-            >
-              {cat.name}
-            </button>
+    <form onSubmit={handleSubmit} className="space-y-4">
+      <div>
+        <label className="block text-sm font-medium text-gray-700">Title</label>
+        <input
+          type="text"
+          required
+          className="w-full border border-gray-300 rounded px-3 py-2"
+          value={title}
+          onChange={(e) => setTitle(e.target.value)}
+        />
+      </div>
+      <div>
+        <label className="block text-sm font-medium text-gray-700">
+          Content
+        </label>
+        <textarea
+          required
+          className="w-full border border-gray-300 rounded px-3 py-2"
+          value={content}
+          onChange={(e) => setContent(e.target.value)}
+          rows={4}
+        />
+      </div>
+      <div>
+        <label className="block text-sm font-medium text-gray-700">
+          Category
+        </label>
+        <select
+          className="w-full border border-gray-300 rounded px-3 py-2"
+          value={category}
+          onChange={(e) => setCategory(e.target.value)}
+        >
+          {categories.map((cat: Category) => (
+            <option key={cat.id} value={cat.name}>
+              {cat.name.charAt(0).toUpperCase() + cat.name.slice(1)}
+            </option>
           ))}
-        </div>
-      </form>
-    </div>
+        </select>
+      </div>
+      {error && <div className="text-red-600 text-sm">{error}</div>}
+
+      <div className="flex gap-2">
+        <button
+          type="submit"
+          disabled={loading}
+          className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50"
+        >
+          {loading
+            ? questionToEdit
+              ? "Saving..."
+              : "Posting..."
+            : questionToEdit
+            ? "Save Changes"
+            : "Post Question"}
+        </button>
+        <button
+          type="button"
+          className="px-4 py-2 bg-gray-300 text-gray-700 rounded hover:bg-gray-400"
+          onClick={onClose}
+        >
+          Cancel
+        </button>
+      </div>
+    </form>
   );
 }

@@ -1,10 +1,13 @@
-'use client';
+"use client";
 
-import { useState } from 'react';
-import { FiX } from 'react-icons/fi';
-import CommentList from './CommentList';
-import { Post, demoUsers } from '../../utils/demoData';
-import Avatar from '../shared/Avatar';
+import { useState } from "react";
+import { useSelector } from "react-redux";
+import { FiX } from "react-icons/fi";
+import CommentList from "./CommentList";
+import { Post } from "../../utils/types";
+import { RootState } from "../../store";
+import { useCommunity } from "../../hooks/useApi";
+import Avatar from "../shared/Avatar";
 
 interface CommentDialogProps {
   open: boolean;
@@ -12,21 +15,27 @@ interface CommentDialogProps {
   post: Post;
 }
 
-export default function CommentDialog({ open, setOpen, post }: CommentDialogProps) {
-  const [commentText, setCommentText] = useState('');
-  const currentUser = demoUsers[0];
+export default function CommentDialog({
+  open,
+  setOpen,
+  post,
+}: CommentDialogProps) {
+  const { user } = useSelector((state: RootState) => state.auth);
+  const { comments } = useCommunity();
+  const [commentText, setCommentText] = useState("");
 
-  const handleComment = () => {
-    if (!commentText.trim()) return;
-    const newComment = {
-      _id: Date.now().toString(),
-      userId: currentUser._id,
-      username: currentUser.username,
-      content: commentText,
-      createdAt: new Date().toISOString(),
-    };
-    post.comments.push(newComment);
-    setCommentText('');
+  const handleComment = async () => {
+    if (!commentText.trim() || !user) return;
+
+    try {
+      await comments.create.execute({
+        content: commentText,
+        postId: post.id,
+      });
+      setCommentText("");
+    } catch (error) {
+      console.error("Error creating comment:", error);
+    }
   };
 
   if (!open) return null;
@@ -42,7 +51,7 @@ export default function CommentDialog({ open, setOpen, post }: CommentDialogProp
         </div>
         <CommentList comments={post.comments} />
         <div className="flex items-center gap-2 mt-4">
-          <Avatar size="xs" image={currentUser.profilePicture} />
+          <Avatar size="xs" image={user?.profilePicture} />
           <input
             type="text"
             placeholder="Add a comment..."

@@ -1,111 +1,102 @@
-'use client';
+"use client";
 
-import { useState, useEffect } from 'react';
-import { Search, ArrowLeft } from 'lucide-react';
-import NewsCard from '../../../components/news/NewsCard';
-import MarketOverview from '../../../components/shared/MarketOverview';
-import useNewsFilter from '../../../hooks/news/useNewsFilter';
-import { useRouter } from 'next/navigation';
+import { useState, useEffect } from "react";
+import { Search, ArrowLeft } from "lucide-react";
+import NewsCard from "../../../components/news/NewsCard";
+import MarketOverview from "../../../components/shared/MarketOverview";
+import { useRouter, useSearchParams } from "next/navigation";
+import { api } from "../../../utils/api";
+import { NewsItem } from "../../../types/news";
+import { Category } from "../../../types/category";
 
 export default function TrendingNews() {
-  const { activeCategory, setActiveCategory } = useNewsFilter('all');
-  const [newsItems, setNewsItems] = useState<any[]>([]);
-  const [searchQuery, setSearchQuery] = useState('');
+  const searchParams = useSearchParams();
   const router = useRouter();
+  const userId = searchParams.get("id");
+  const urlCategory = searchParams.get("category");
+  const urlSearch = searchParams.get("search");
 
-  const demoNews = [
-    {
-      id: 1,
-      title: 'Federal Reserve Signals Rate Cut in Q4',
-      shortDescription: 'Fed hints at Q4 rate cut to boost economy.',
-      image: '/images/placeholder-news.jpg',
-      views: 128,
-      timestamp: '1 hour ago',
-      category: 'economy',
-    },
-    {
-      id: 2,
-      title: 'Tesla Stock Surges After Q3 Earnings',
-      shortDescription: 'Tesla shares soar post Q3 earnings.',
-      image: '/images/placeholder-news.jpg',
-      views: 245,
-      timestamp: '3 hours ago',
-      category: 'stocks',
-    },
-    {
-      id: 3,
-      title: 'Crypto Market Sees Volatility Amid Regulatory Talks',
-      shortDescription: 'Crypto prices swing due to regulatory talks.',
-      image: '/images/placeholder-news.jpg',
-      views: 180,
-      timestamp: '5 hours ago',
-      category: 'crypto',
-    },
-    {
-      id: 4,
-      title: 'NIFTY Bank Index Hits Record High',
-      shortDescription: 'NIFTY Bank index reaches all-time high.',
-      image: '/images/placeholder-news.jpg',
-      views: 300,
-      timestamp: '2 hours ago',
-      category: 'stocks',
-    },
-    {
-      id: 5,
-      title: 'ETFs Gain Popularity Among Retail Investors',
-      shortDescription: 'ETFs see surge in retail investor interest.',
-      image: '/images/placeholder-news.jpg',
-      views: 95,
-      timestamp: '6 hours ago',
-      category: 'etfs',
-    },
-    {
-      id: 6,
-      title: 'Tech Stocks Rally on AI Breakthroughs',
-      shortDescription: 'Tech stocks rally on AI advancements.',
-      image: '/images/placeholder-news.jpg',
-      views: 210,
-      timestamp: '4 hours ago',
-      category: 'stocks',
-    },
-    {
-      id: 7,
-      title: 'Gold Prices Surge Amid Economic Uncertainty',
-      shortDescription: 'Gold prices rise amid uncertainty.',
-      image: '/images/placeholder-news.jpg',
-      views: 150,
-      timestamp: '7 hours ago',
-      category: 'economy',
-    },
-    {
-      id: 8,
-      title: 'RBI Tightens Crypto Regulations',
-      shortDescription: 'RBI imposes stricter crypto rules.',
-      image: '/images/placeholder-news.jpg',
-      views: 175,
-      timestamp: '8 hours ago',
-      category: 'crypto',
-    },
-  ];
+  const [newsItems, setNewsItems] = useState<NewsItem[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [searchQuery, setSearchQuery] = useState(urlSearch || "");
+  const [activeCategory, setActiveCategory] = useState(urlCategory || "all");
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    const sortedNews = [...demoNews].sort((a, b) => b.views - a.views);
-    setNewsItems(sortedNews);
+    const fetchTrendingNews = async () => {
+      try {
+        setLoading(true);
+        const params: Record<string, string> = {};
+        if (activeCategory && activeCategory !== "all")
+          params.category = activeCategory;
+        if (searchQuery) params.search = searchQuery;
+        const response = await api.news.getTrendingNews(params);
+        console.log("Fetched trending news:", response);
+        if (response.success && response.data) {
+          setNewsItems(response.data.data || response.data);
+        } else {
+          setNewsItems([]);
+        }
+      } catch (error) {
+        setNewsItems([]);
+        console.error("Error fetching trending news:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchTrendingNews();
+  }, [activeCategory, searchQuery]);
+
+  useEffect(() => {
+    const fetchCategories = async () => {
+      try {
+        const response = await api.news.getCategories();
+        console.log("Fetched categories:", response);
+        if (response.success && response.data) {
+          setCategories([
+            { id: "all", name: "All News" },
+            ...response.data.map((cat: string) => ({
+              id: cat,
+              name: cat.charAt(0).toUpperCase() + cat.slice(1),
+            })),
+          ]);
+        } else {
+          setCategories([{ id: "all", name: "All News" }]);
+        }
+      } catch (err) {
+        setCategories([{ id: "all", name: "All News" }]);
+        console.error("Error fetching categories:", err);
+      }
+    };
+    fetchCategories();
   }, []);
 
-  const filteredNews = newsItems.filter(
-    (item) =>
-      (activeCategory === 'all' || item.category === activeCategory) &&
-      item.title.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  // Update URL parameters when state changes
+  const updateURLParams = (newCategory?: string, newSearch?: string) => {
+    const params = new URLSearchParams();
+    if (userId) params.set("id", userId);
+    if (newCategory && newCategory !== "all")
+      params.set("category", newCategory);
+    if (newSearch) params.set("search", newSearch);
 
-  const categories = [
-    { id: 'all', name: 'All News' },
-    { id: 'crypto', name: 'Crypto' },
-    { id: 'stocks', name: 'Stocks' },
-    { id: 'etfs', name: 'ETFs' },
-    { id: 'economy', name: 'Economy' },
-  ];
+    const newURL = params.toString()
+      ? `/news/trending?${params.toString()}`
+      : "/news/trending";
+    router.push(newURL);
+  };
+
+  // Handle search query changes
+  const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    setSearchQuery(value);
+    updateURLParams(activeCategory, value);
+  };
+
+  // Handle category changes
+  const handleCategoryChange = (categoryId: string) => {
+    setActiveCategory(categoryId);
+    updateURLParams(categoryId, searchQuery);
+  };
 
   const handleBack = () => {
     router.back();
@@ -121,7 +112,9 @@ export default function TrendingNews() {
         <ArrowLeft size={16} />
         Back
       </button>
-      <h2 className="text-xl font-semibold text-gray-800 mb-4">Trending News</h2>
+      <h2 className="text-xl font-semibold text-gray-800 mb-4">
+        Trending News
+      </h2>
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
         <div className="relative w-full sm:w-64">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
@@ -129,7 +122,7 @@ export default function TrendingNews() {
             type="text"
             placeholder="Search trending news..."
             value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
+            onChange={handleSearchChange}
             className="w-full pl-10 pr-4 py-2 rounded-lg border border-gray-200 focus:ring-2 focus:ring-blue-400 focus:border-transparent text-sm"
           />
         </div>
@@ -137,11 +130,11 @@ export default function TrendingNews() {
           {categories.map((category) => (
             <button
               key={category.id}
-              onClick={() => setActiveCategory(category.id)}
+              onClick={() => handleCategoryChange(category.id)}
               className={`px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap ${
                 activeCategory === category.id
-                  ? 'bg-blue-500 text-white'
-                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                  ? "bg-blue-500 text-white"
+                  : "bg-gray-100 text-gray-700 hover:bg-gray-200"
               }`}
             >
               {category.name}
@@ -150,12 +143,20 @@ export default function TrendingNews() {
         </div>
       </div>
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-        {filteredNews.length > 0 ? (
-          filteredNews.map((news) => <NewsCard key={news.id} news={news} />)
+        {loading ? (
+          <div className="col-span-full bg-white rounded-lg shadow-sm p-8 text-center border border-gray-200">
+            <p className="text-gray-500">Loading trending news...</p>
+          </div>
+        ) : newsItems.length > 0 ? (
+          newsItems.map((news) => <NewsCard key={news.id} news={news} />)
         ) : (
           <div className="col-span-full bg-white rounded-lg shadow-sm p-8 text-center border border-gray-200">
-            <h3 className="text-lg font-medium text-gray-700">No trending news</h3>
-            <p className="mt-2 text-gray-500">Try adjusting your search or category.</p>
+            <h3 className="text-lg font-medium text-gray-700">
+              No trending news
+            </h3>
+            <p className="mt-2 text-gray-500">
+              Try adjusting your search or category.
+            </p>
           </div>
         )}
       </div>

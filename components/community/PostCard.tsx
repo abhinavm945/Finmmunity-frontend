@@ -1,55 +1,73 @@
-'use client';
+"use client";
 
-import { useState } from 'react';
-import Image from 'next/image';
-import Link from 'next/link';
-import { FaRegHeart, FaHeart } from 'react-icons/fa';
-import { MessageCircle, Bookmark, BookmarkCheck } from 'lucide-react';
-import { formatDate } from '../../utils/formatDate';
-import { Post, demoPosts, demoUsers } from '../../utils/demoData';
-import CommentDialog from './CommentDialog';
-import Avatar from '../shared/Avatar';
+import { useState } from "react";
+import { useSelector } from "react-redux";
+import Image from "next/image";
+import Link from "next/link";
+import { FaRegHeart, FaHeart } from "react-icons/fa";
+import { MessageCircle, Bookmark, BookmarkCheck } from "lucide-react";
+import { formatDate } from "../../utils/formatDate";
+import { Post } from "../../utils/types";
+import { useCommunity } from "../../hooks/useApi";
+import CommentDialog from "./CommentDialog";
+import Avatar from "../shared/Avatar";
 
 interface PostCardProps {
   post: Post;
 }
 
 export default function PostCard({ post }: PostCardProps) {
-  const [isLiked, setIsLiked] = useState(post.likes.includes(demoUsers[0]._id));
+  const user = useSelector((state) => state.user?.user);
+  const { posts, bookmarks } = useCommunity();
+
+  const [isLiked, setIsLiked] = useState(post.likes.includes(user?.id || ""));
   const [likeCount, setLikeCount] = useState(post.likes.length);
-  const [isBookmarked, setIsBookmarked] = useState(post.isBookmarked);
+  const [isBookmarked, setIsBookmarked] = useState(post.isBookmarked || false);
   const [openCommentDialog, setOpenCommentDialog] = useState(false);
 
-  const handleLike = () => {
-    setIsLiked(!isLiked);
-    setLikeCount(isLiked ? likeCount - 1 : likeCount + 1);
-    if (isLiked) {
-      post.likes = post.likes.filter((id) => id !== demoUsers[0]._id);
-    } else {
-      post.likes.push(demoUsers[0]._id);
+  const handleLike = async () => {
+    if (!user) return;
+
+    try {
+      if (isLiked) {
+        await posts.unlike.execute({ id: post.id });
+        setLikeCount((prev) => prev - 1);
+      } else {
+        await posts.like.execute({ id: post.id });
+        setLikeCount((prev) => prev + 1);
+      }
+      setIsLiked(!isLiked);
+    } catch (error) {
+      console.error("Error toggling like:", error);
     }
   };
 
-  const handleBookmark = () => {
-    setIsBookmarked(!isBookmarked);
-    post.isBookmarked = !isBookmarked;
-    const user = demoUsers[0];
-    if (isBookmarked) {
-      user.bookmarks = user.bookmarks.filter((b) => b.id !== post._id);
-    } else {
-      user.bookmarks.push({ type: 'post', id: post._id });
+  const handleBookmark = async () => {
+    if (!user) return;
+
+    try {
+      if (isBookmarked) {
+        await bookmarks.remove.execute({ id: post.id });
+      } else {
+        await bookmarks.add.execute({ type: "POST", postId: post.id });
+      }
+      setIsBookmarked(!isBookmarked);
+    } catch (error) {
+      console.error("Error toggling bookmark:", error);
     }
   };
 
   return (
     <div className="bg-white rounded-lg shadow-md p-4 max-w-xl mx-auto">
       <div className="flex items-center gap-3">
-        <Link href={`/profile/${post.userId}`}>
-          <Avatar image={post.profilePicture} size="md" />
+        <Link href={`/profile/${post.user.id}`}>
+          <Avatar image={post.user.profilePicture} size="md" />
         </Link>
         <div>
-          <Link href={`/profile/${post.userId}`}>
-            <p className="font-semibold text-gray-800 hover:underline">{post.username}</p>
+          <Link href={`/profile/${post.user.id}`}>
+            <p className="font-semibold text-gray-800 hover:underline">
+              {post.user.username}
+            </p>
           </Link>
           <p className="text-sm text-gray-500">{formatDate(post.createdAt)}</p>
         </div>
