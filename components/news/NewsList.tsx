@@ -1,202 +1,280 @@
-'use client';
+"use client";
 
-import { useState, useEffect } from 'react';
-import { Search } from 'lucide-react';
-import NewsCard from './NewsCard';
-import MarketOverview from '../shared/MarketOverview';
-import useNewsFilter from '../../hooks/news/useNewsFilter';
-import Link from 'next/link';
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
+import { Search, Filter } from "lucide-react";
+import NewsCard from "./NewsCard";
+import MarketOverview from "../shared/MarketOverview";
+import Link from "next/link";
+import { useSearchParams, useRouter } from "next/navigation";
+import { useDispatch, useSelector } from "react-redux";
+import { fetchNews, clearNews } from "../../redux/newsSlice";
+import { api } from "../../utils/api";
+import { NewsItem } from "../../types/news";
+import { Category } from "../../types/category";
 
 export default function NewsList() {
-  const { activeCategory, setActiveCategory } = useNewsFilter('all');
-  const [newsItems, setNewsItems] = useState<any[]>([]);
-  const [searchQuery, setSearchQuery] = useState('');
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  const userId = searchParams.get("id");
+  const urlCategory = searchParams.get("category");
+  const urlSearch = searchParams.get("search");
+  const urlPage = searchParams.get("page");
 
-  const demoNews = [
-    {
-      id: 1,
-      title: 'Federal Reserve Signals Rate Cut in Q4',
-      description: 'The Fed hinted at a potential rate cut to stimulate economic growth amid slowing inflation. This move could impact markets significantly.',
-      shortDescription: 'Fed hints at Q4 rate cut to boost economy.',
-      image: '/images/placeholder-news.jpg',
-      author: 'EconWatch',
-      username: 'econ_watch',
-      views: 128,
-      timestamp: '1 hour ago',
-      category: 'economy',
-    },
-    {
-      id: 2,
-      title: 'Tesla Stock Surges After Q3 Earnings',
-      description: 'Tesla reported record profits, driven by strong EV demand and cost efficiencies, leading to a surge in stock prices.',
-      shortDescription: 'Tesla shares soar post Q3 earnings.',
-      image: '/images/placeholder-news.jpg',
-      author: 'TechInsider',
-      username: 'tech_insider',
-      views: 245,
-      timestamp: '3 hours ago',
-      category: 'stocks',
-    },
-    {
-      id: 3,
-      title: 'Crypto Market Sees Volatility Amid Regulatory Talks',
-      description: 'Bitcoin and Ethereum prices fluctuated as global regulators discussed new crypto policies.',
-      shortDescription: 'Crypto prices swing due to regulatory talks.',
-      image: '/images/placeholder-news.jpg',
-      author: 'CryptoNews',
-      username: 'crypto_news',
-      views: 180,
-      timestamp: '5 hours ago',
-      category: 'crypto',
-    },
-    {
-      id: 4,
-      title: 'NIFTY Bank Index Hits Record High',
-      description: 'Strong performances by HDFC Bank and ICICI Bank drove the NIFTY Bank index to a new peak.',
-      shortDescription: 'NIFTY Bank index reaches all-time high.',
-      image: '/images/placeholder-news.jpg',
-      author: 'MarketPulse',
-      username: 'market_pulse',
-      views: 300,
-      timestamp: '2 hours ago',
-      category: 'stocks',
-    },
-    {
-      id: 5,
-      title: 'ETFs Gain Popularity Among Retail Investors',
-      description: 'Low-cost ETFs are attracting more retail investors seeking diversified portfolios.',
-      shortDescription: 'ETFs see surge in retail investor interest.',
-      image: '/images/placeholder-news.jpg',
-      author: 'InvestSmart',
-      username: 'invest_smart',
-      views: 95,
-      timestamp: '6 hours ago',
-      category: 'etfs',
-    },
-    {
-      id: 6,
-      title: 'Tech Stocks Rally on AI Breakthroughs',
-      description: 'Advancements in AI technology have sparked a rally in tech stocks, with companies like Nvidia leading the charge.',
-      shortDescription: 'Tech stocks rally on AI advancements.',
-      image: '/images/placeholder-news.jpg',
-      author: 'TechTrend',
-      username: 'tech_trend',
-      views: 210,
-      timestamp: '4 hours ago',
-      category: 'stocks',
-    },
-    {
-      id: 7,
-      title: 'Gold Prices Surge Amid Economic Uncertainty',
-      description: 'Investors are flocking to gold as a safe haven amid global economic concerns.',
-      shortDescription: 'Gold prices rise amid uncertainty.',
-      image: '/images/placeholder-news.jpg',
-      author: 'MarketWatch',
-      username: 'market_watch',
-      views: 150,
-      timestamp: '7 hours ago',
-      category: 'economy',
-    },
-    {
-      id: 8,
-      title: 'RBI Tightens Crypto Regulations',
-      description: 'The Reserve Bank of India has introduced stricter regulations for cryptocurrency trading.',
-      shortDescription: 'RBI imposes stricter crypto rules.',
-      image: '/images/placeholder-news.jpg',
-      author: 'FinanceToday',
-      username: 'finance_today',
-      views: 175,
-      timestamp: '8 hours ago',
-      category: 'crypto',
-    },
-  ];
-
-  useEffect(() => {
-    setNewsItems(demoNews);
-  }, []);
-
-  const filteredNews = newsItems.filter(
-    (item) =>
-      (activeCategory === 'all' || item.category === activeCategory) &&
-      item.title.toLowerCase().includes(searchQuery.toLowerCase())
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [searchQuery, setSearchQuery] = useState(urlSearch || "");
+  const [activeCategory, setActiveCategory] = useState(urlCategory || "all");
+  const [currentPage, setCurrentPage] = useState(parseInt(urlPage || "1"));
+  const itemsPerPage = 10;
+  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState(
+    urlSearch || ""
   );
 
-  const trendingNews = [...demoNews]
-    .sort((a, b) => b.views - a.views)
-    .slice(0, 7);
+  const dispatch = useDispatch();
+  const { news = [], loading, error } = useSelector((state) => state.news);
 
-  const categories = [
-    { id: 'all', name: 'All News' },
-    { id: 'crypto', name: 'Crypto' },
-    { id: 'stocks', name: 'Stocks' },
-    { id: 'etfs', name: 'ETFs' },
-    { id: 'economy', name: 'Economy' },
-  ];
+  // Use a ref to track if we've already fetched data for the current params
+  const lastFetchParams = useRef<string>("");
+
+  // Debounce search query
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearchQuery(searchQuery);
+    }, 500); // 500ms delay
+
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
+
+  // Memoize the params to prevent unnecessary API calls
+  const requestParams = useMemo(() => {
+    const params: Record<string, string | number> = {
+      page: currentPage,
+      limit: itemsPerPage,
+    };
+    if (activeCategory && activeCategory !== "all")
+      params.category = activeCategory;
+    if (debouncedSearchQuery) params.search = debouncedSearchQuery;
+    return params;
+  }, [currentPage, activeCategory, debouncedSearchQuery, itemsPerPage]);
+
+  // Create a string key for the current params to check if we need to fetch
+  const paramsKey = useMemo(
+    () => JSON.stringify(requestParams),
+    [requestParams]
+  );
+
+  // Memoize the fetch function to prevent recreation on every render
+  const fetchNewsData = useCallback(() => {
+    // Only fetch if params have changed or if we don't have data
+    if (paramsKey !== lastFetchParams.current || news.length === 0) {
+      lastFetchParams.current = paramsKey;
+      dispatch(fetchNews(requestParams));
+    }
+  }, [dispatch, requestParams, paramsKey, news.length]);
+
+  useEffect(() => {
+    fetchNewsData();
+  }, [fetchNewsData]);
+
+  // Cleanup effect to clear news data when component unmounts
+  useEffect(() => {
+    return () => {
+      // Only clear if we're not on a page that needs the news data
+      const currentPath = window.location.pathname;
+      if (currentPath !== "/" && currentPath !== "/news") {
+        dispatch(clearNews());
+      }
+      // Clear any pending requests for this component
+      api.client.clearRequestQueue();
+    };
+  }, [dispatch]);
+
+  // Keep the categories fetching logic as is (if you want to use Redux for categories, add a thunk)
+  useEffect(() => {
+    const fetchCategories = async () => {
+      try {
+        // You can use Redux for this if you want
+        const response = await import("../../utils/api").then((m) =>
+          m.api.news.getCategories()
+        );
+        if (response.success && Array.isArray(response.data)) {
+          setCategories([
+            { id: "all", name: "All News" },
+            ...response.data.map((cat: string) => ({
+              id: cat,
+              name: cat.charAt(0).toUpperCase() + cat.slice(1),
+            })),
+          ]);
+        } else {
+          setCategories([{ id: "all", name: "All News" }]);
+        }
+      } catch (error) {
+        setCategories([{ id: "all", name: "All News" }]);
+        console.error("Error fetching categories:", error);
+      }
+    };
+    fetchCategories();
+  }, []);
+
+  // Update URL parameters when state changes
+  const updateURLParams = useCallback(
+    (newCategory?: string, newSearch?: string, newPage?: number) => {
+      const params = new URLSearchParams();
+      if (userId) params.set("id", userId);
+      if (newCategory && newCategory !== "all")
+        params.set("category", newCategory);
+      if (newSearch) params.set("search", newSearch);
+      if (newPage && newPage > 1) params.set("page", newPage.toString());
+
+      const newURL = params.toString() ? `/?${params.toString()}` : "/";
+      router.push(newURL);
+    },
+    [userId, router]
+  );
+
+  // Handle search query changes
+  const handleSearchChange = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      const value = e.target.value;
+      setSearchQuery(value);
+      setCurrentPage(1);
+    },
+    []
+  );
+
+  // Update URL when debounced search changes
+  useEffect(() => {
+    updateURLParams(activeCategory, debouncedSearchQuery, currentPage);
+  }, [debouncedSearchQuery, activeCategory, currentPage, updateURLParams]);
+
+  // Handle category changes
+  const handleCategoryChange = useCallback(
+    (e: React.ChangeEvent<HTMLSelectElement>) => {
+      const value = e.target.value;
+      setActiveCategory(value);
+      setCurrentPage(1);
+      updateURLParams(value, debouncedSearchQuery, 1);
+    },
+    [debouncedSearchQuery, updateURLParams]
+  );
+
+  // Calculate totalPages if your API provides it in Redux, otherwise keep as is
 
   return (
-    <div className="max-w-7xl mx-auto px-4 py-6">
+    <div className="max-w-7xl mx-auto">
+      <h2 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-gray-800 mb-2">
+        News
+      </h2>
+      {/* Market Overview */}
       <MarketOverview />
-      <div className="mb-8">
-        <div className="flex justify-between items-center mb-4">
-          <h2 className="text-xl font-semibold text-gray-800">Trending News</h2>
-          <Link href="/news/trending">
-            <button className="px-6 py-2 bg-gradient-to-r from-blue-500 to-purple-500 text-white rounded-full shadow-md hover:shadow-lg transition-all text-sm hover:cursor-pointer">
-              See All Trending News
-            </button>
-          </Link>
-        </div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {trendingNews.map((news) => (
-            <NewsCard key={news.id} news={news} />
-          ))}
-        </div>
-      </div>
+
+      {/* Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
-        <div className="relative w-full sm:w-64">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+        <div>
+          <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-gray-800 mb-2">
+            Latest News
+          </h1>
+          <p className="text-gray-600 text-sm sm:text-base">
+            Stay updated with the latest financial news and market insights from
+            trusted sources
+          </p>
+        </div>
+        <Link href="/news/trending">
+          <button className="flex items-center gap-2 px-4 sm:px-6 py-2 sm:py-3 bg-gradient-to-r from-blue-500 to-purple-500 text-white rounded-full shadow-md hover:shadow-lg transition-all text-sm sm:text-base">
+            <span className="hidden sm:inline">Trending News</span>
+            <span className="sm:hidden">Trending</span>
+          </button>
+        </Link>
+      </div>
+
+      {/* Search and Filter */}
+      <div className="flex flex-col sm:flex-row gap-4 mb-6">
+        <div className="relative flex-1">
+          <Search
+            className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"
+            size={20}
+          />
           <input
             type="text"
             placeholder="Search news..."
             value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-10 pr-4 py-2 rounded-lg border border-gray-200 focus:ring-2 focus:ring-blue-400 focus:border-transparent text-sm "
+            onChange={handleSearchChange}
+            className="w-full pl-10 pr-4 py-2 sm:py-3 rounded-lg border border-gray-200 focus:ring-2 focus:ring-blue-400 focus:border-transparent text-sm sm:text-base"
           />
         </div>
-        <div className="flex space-x-2 overflow-x-auto w-full sm:w-auto">
-          {categories.map((category) => (
-            <button
-              key={category.id}
-              onClick={() => setActiveCategory(category.id)}
-              className={`px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap ${
-                activeCategory === category.id
-                  ? 'bg-blue-500 text-white'
-                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-              }`}
-            >
-              {category.name}
-            </button>
-          ))}
+        <div className="flex items-center gap-2">
+          <Filter className="text-gray-400" size={20} />
+          <select
+            value={activeCategory}
+            onChange={handleCategoryChange}
+            className="px-3 sm:px-4 py-2 sm:py-3 rounded-lg border border-gray-200 focus:ring-2 focus:ring-blue-400 focus:border-transparent text-sm sm:text-base"
+          >
+            {categories.map((category) => (
+              <option key={category.id} value={category.id}>
+                {category.name}
+              </option>
+            ))}
+          </select>
         </div>
       </div>
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-        {filteredNews.length > 0 ? (
-          filteredNews.map((news) => <NewsCard key={news.id} news={news} />)
+
+      {/* News List */}
+      <div className="space-y-4 sm:space-y-6">
+        {loading ? (
+          <div className="text-center py-12">Loading...</div>
+        ) : error ? (
+          <div className="text-center py-12 text-red-500">{error}</div>
+        ) : news.length > 0 ? (
+          news.map((newsItem: NewsItem) => (
+            <NewsCard key={newsItem.id} news={newsItem} />
+          ))
         ) : (
-          <div className="col-span-full bg-white rounded-lg shadow-sm p-8 text-center border border-gray-200">
-            <h3 className="text-lg font-medium text-gray-700">No news found</h3>
-            <p className="mt-2 text-gray-500">Try adjusting your search or category.</p>
+          <div className="text-center py-12">
+            <h3 className="text-lg sm:text-xl font-medium text-gray-700 mb-2">
+              No news found
+            </h3>
+            <p className="text-gray-500 text-sm sm:text-base mb-4">
+              Try adjusting your search or filter criteria.
+            </p>
+            <Link href="/news/allnews">
+              <button className="px-4 sm:px-6 py-2 sm:py-3 bg-gradient-to-r from-blue-500 to-purple-500 text-white rounded-full shadow-md hover:shadow-lg transition-all text-sm sm:text-base">
+                Browse All News
+              </button>
+            </Link>
           </div>
         )}
       </div>
-      {filteredNews.length > 0 && (
-        <div className="mt-8 flex justify-center">
-          <Link href="/news/allnews">
-            <button className="px-6 py-2 bg-gradient-to-r from-blue-500 to-purple-500 text-white rounded-full shadow-md hover:shadow-lg transition-all text-md hover:cursor-pointer">
-              See All News
+
+      {/* Pagination */}
+      {/* totalPages is not directly available in the Redux state, so we'll keep the original logic */}
+      {/* If your API provides totalPages, you would set it here */}
+      {/* For now, we'll assume a placeholder or calculate it if available */}
+      {/* Example: const totalPages = Math.ceil(news.length / itemsPerPage); */}
+      {/* This part of the logic needs to be adjusted based on how totalPages is obtained */}
+      {/* For now, we'll keep the original structure but acknowledge the missing totalPages */}
+      {/* If your API provides totalPages, uncomment and set the value */}
+      {/* {totalPages > 1 && (
+        <div className="flex justify-center mt-8">
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => handlePageChange(currentPage - 1)}
+              disabled={currentPage === 1}
+              className="px-3 sm:px-4 py-2 rounded-lg border border-gray-200 text-sm sm:text-base disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
+            >
+              Previous
             </button>
-          </Link>
+            <span className="px-3 sm:px-4 py-2 text-sm sm:text-base text-gray-600">
+              Page {currentPage} of {totalPages}
+            </span>
+            <button
+              onClick={() => handlePageChange(currentPage + 1)}
+              disabled={currentPage === totalPages}
+              className="px-3 sm:px-4 py-2 rounded-lg border border-gray-200 text-sm sm:text-base disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
+            >
+              Next
+            </button>
+          </div>
         </div>
-      )}
+      )} */}
     </div>
   );
 }

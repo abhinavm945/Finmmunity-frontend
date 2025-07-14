@@ -1,7 +1,7 @@
-'use client';
+"use client";
 
-import BlogCard from './BlogCard';
-import { Blog } from '../../utils/demoData';
+import BlogCard from "./BlogCard";
+import { Blog } from "../../utils/demoData";
 
 interface BlogListProps {
   blogs: Blog[];
@@ -9,9 +9,9 @@ interface BlogListProps {
 
 export default function BlogList({ blogs }: BlogListProps) {
   return (
-    <div className="space-y-4 max-w-7xl mx-auto px-4 py-6">
+    <div className="space-y-4">
       {blogs.length > 0 ? (
-        blogs.map((blog) => <BlogCard key={blog._id} blog={blog} />)
+        blogs.map((blog) => <BlogCard key={blog.id} blog={blog} />)
       ) : (
         <p className="text-center text-gray-500">No blogs available.</p>
       )}

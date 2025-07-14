@@ -1,0 +1,99 @@
+{
+  "info": {
+    "_postman_id": "finmunity-api-collection",
+    "name": "Finmunity API",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Auth",
+      "item": [
+        { "name": "Register", "request": { "method": "POST", "header": [], "url": { "raw": "{{baseUrl}}/auth/register", "host": ["{{baseUrl}}"], "path": ["auth", "register"] }, "body": { "mode": "raw", "raw": "{\n  \"email\": \"test@example.com\",\n  \"password\": \"password\"\n}" } } },
+        { "name": "Login", "request": { "method": "POST", "header": [], "url": { "raw": "{{baseUrl}}/auth/login", "host": ["{{baseUrl}}"], "path": ["auth", "login"] }, "body": { "mode": "raw", "raw": "{\n  \"email\": \"test@example.com\",\n  \"password\": \"password\"\n}" } } },
+        { "name": "Logout", "request": { "method": "POST", "header": [], "url": { "raw": "{{baseUrl}}/auth/logout", "host": ["{{baseUrl}}"], "path": ["auth", "logout"] } } },
+        { "name": "Refresh Token", "request": { "method": "POST", "header": [], "url": { "raw": "{{baseUrl}}/auth/refresh", "host": ["{{baseUrl}}"], "path": ["auth", "refresh"] } } },
+        { "name": "Forgot Password", "request": { "method": "POST", "header": [], "url": { "raw": "{{baseUrl}}/auth/forgot-password", "host": ["{{baseUrl}}"], "path": ["auth", "forgot-password"] }, "body": { "mode": "raw", "raw": "{\n  \"email\": \"test@example.com\"\n}" } } },
+        { "name": "Reset Password", "request": { "method": "POST", "header": [], "url": { "raw": "{{baseUrl}}/auth/reset-password", "host": ["{{baseUrl}}"], "path": ["auth", "reset-password"] }, "body": { "mode": "raw", "raw": "{\n  \"token\": \"reset-token\",\n  \"password\": \"newpassword\"\n}" } } },
+        { "name": "Get Current User", "request": { "method": "GET", "header": [], "url": { "raw": "{{baseUrl}}/auth/me", "host": ["{{baseUrl}}"], "path": ["auth", "me"] } } },
+        { "name": "Update Profile", "request": { "method": "PUT", "header": [], "url": { "raw": "{{baseUrl}}/auth/profile", "host": ["{{baseUrl}}"], "path": ["auth", "profile"] }, "body": { "mode": "raw", "raw": "{\n  \"username\": \"newname\"\n}" } } }
+      ]
+    },
+    {
+      "name": "User",
+      "item": [
+        { "name": "Get User Profile", "request": { "method": "GET", "url": { "raw": "{{baseUrl}}/user/:id", "host": ["{{baseUrl}}"], "path": ["user", ":id"] } } },
+        { "name": "Get User Posts", "request": { "method": "GET", "url": { "raw": "{{baseUrl}}/user/:id/posts", "host": ["{{baseUrl}}"], "path": ["user", ":id", "posts"] } } },
+        { "name": "Get User Blogs", "request": { "method": "GET", "url": { "raw": "{{baseUrl}}/user/:id/blogs", "host": ["{{baseUrl}}"], "path": ["user", ":id", "blogs"] } } },
+        { "name": "Get User Followers", "request": { "method": "GET", "url": { "raw": "{{baseUrl}}/user/:id/followers", "host": ["{{baseUrl}}"], "path": ["user", ":id", "followers"] } } },
+        { "name": "Get User Following", "request": { "method": "GET", "url": { "raw": "{{baseUrl}}/user/:id/following", "host": ["{{baseUrl}}"], "path": ["user", ":id", "following"] } } },
+        { "name": "Get User Bookmarks", "request": { "method": "GET", "url": { "raw": "{{baseUrl}}/user/:id/bookmarks", "host": ["{{baseUrl}}"], "path": ["user", ":id", "bookmarks"] } } },
+        { "name": "Follow/Unfollow User", "request": { "method": "POST", "url": { "raw": "{{baseUrl}}/user/:id/follow", "host": ["{{baseUrl}}"], "path": ["user", ":id", "follow"] } } },
+        { "name": "Update User Profile", "request": { "method": "PUT", "url": { "raw": "{{baseUrl}}/user/profile", "host": ["{{baseUrl}}"], "path": ["user", "profile"] }, "body": { "mode": "raw", "raw": "{\n  \"username\": \"newname\"\n}" } } },
+        { "name": "Add Bookmark", "request": { "method": "POST", "url": { "raw": "{{baseUrl}}/user/bookmarks", "host": ["{{baseUrl}}"], "path": ["user", "bookmarks"] }, "body": { "mode": "raw", "raw": "{\n  \"itemId\": \"id\",\n  \"type\": \"POST\"\n}" } } },
+        { "name": "Remove Bookmark", "request": { "method": "DELETE", "url": { "raw": "{{baseUrl}}/user/bookmarks/:id", "host": ["{{baseUrl}}"], "path": ["user", "bookmarks", ":id"] } } },
+        { "name": "Get Suggested Users", "request": { "method": "GET", "url": { "raw": "{{baseUrl}}/user/suggested", "host": ["{{baseUrl}}"], "path": ["user", "suggested"] } } }
+      ]
+    },
+    {
+      "name": "News",
+      "item": [
+        { "name": "Get Trending News", "request": { "method": "GET", "url": { "raw": "{{baseUrl}}/news/trending", "host": ["{{baseUrl}}"], "path": ["news", "trending"] } } },
+        { "name": "Get News Categories", "request": { "method": "GET", "url": { "raw": "{{baseUrl}}/news/categories", "host": ["{{baseUrl}}"], "path": ["news", "categories"] } } },
+        { "name": "Get All News", "request": { "method": "GET", "url": { "raw": "{{baseUrl}}/news", "host": ["{{baseUrl}}"], "path": ["news"] } } },
+        { "name": "Get News By ID", "request": { "method": "GET", "url": { "raw": "{{baseUrl}}/news/:id", "host": ["{{baseUrl}}"], "path": ["news", ":id"] } } },
+        { "name": "Create News", "request": { "method": "POST", "url": { "raw": "{{baseUrl}}/news", "host": ["{{baseUrl}}"], "path": ["news"] }, "body": { "mode": "raw", "raw": "{\n  \"title\": \"Sample News\",\n  \"content\": \"Content\"\n}" } } },
+        { "name": "Update News", "request": { "method": "PUT", "url": { "raw": "{{baseUrl}}/news/:id", "host": ["{{baseUrl}}"], "path": ["news", ":id"] }, "body": { "mode": "raw", "raw": "{\n  \"title\": \"Updated News\",\n  \"content\": \"Updated Content\"\n}" } } },
+        { "name": "Delete News", "request": { "method": "DELETE", "url": { "raw": "{{baseUrl}}/news/:id", "host": ["{{baseUrl}}"], "path": ["news", ":id"] } } }
+      ]
+    },
+    {
+      "name": "Community",
+      "item": [
+        { "name": "Get Community Overview", "request": { "method": "GET", "url": { "raw": "{{baseUrl}}/community", "host": ["{{baseUrl}}"], "path": ["community"] } } },
+        { "name": "Create Post", "request": { "method": "POST", "url": { "raw": "{{baseUrl}}/community/posts", "host": ["{{baseUrl}}"], "path": ["community", "posts"] } } },
+        { "name": "Get All Posts", "request": { "method": "GET", "url": { "raw": "{{baseUrl}}/community/posts", "host": ["{{baseUrl}}"], "path": ["community", "posts"] } } },
+        { "name": "Get Single Post", "request": { "method": "GET", "url": { "raw": "{{baseUrl}}/community/posts/:id", "host": ["{{baseUrl}}"], "path": ["community", "posts", ":id"] } } },
+        { "name": "Update Post", "request": { "method": "PUT", "url": { "raw": "{{baseUrl}}/community/posts/:id", "host": ["{{baseUrl}}"], "path": ["community", "posts", ":id"] } } },
+        { "name": "Delete Post", "request": { "method": "DELETE", "url": { "raw": "{{baseUrl}}/community/posts/:id", "host": ["{{baseUrl}}"], "path": ["community", "posts", ":id"] } } },
+        { "name": "Like/Unlike Post", "request": { "method": "POST", "url": { "raw": "{{baseUrl}}/community/posts/:id/like", "host": ["{{baseUrl}}"], "path": ["community", "posts", ":id", "like"] } } },
+        { "name": "Bookmark/Unbookmark Post", "request": { "method": "POST", "url": { "raw": "{{baseUrl}}/community/posts/:id/bookmark", "host": ["{{baseUrl}}"], "path": ["community", "posts", ":id", "bookmark"] } } },
+        { "name": "Create Blog", "request": { "method": "POST", "url": { "raw": "{{baseUrl}}/community/blogs", "host": ["{{baseUrl}}"], "path": ["community", "blogs"] } } },
+        { "name": "Get All Blogs", "request": { "method": "GET", "url": { "raw": "{{baseUrl}}/community/blogs", "host": ["{{baseUrl}}"], "path": ["community", "blogs"] } } },
+        { "name": "Get Single Blog", "request": { "method": "GET", "url": { "raw": "{{baseUrl}}/community/blogs/:id", "host": ["{{baseUrl}}"], "path": ["community", "blogs", ":id"] } } },
+        { "name": "Update Blog", "request": { "method": "PUT", "url": { "raw": "{{baseUrl}}/community/blogs/:id", "host": ["{{baseUrl}}"], "path": ["community", "blogs", ":id"] } } },
+        { "name": "Delete Blog", "request": { "method": "DELETE", "url": { "raw": "{{baseUrl}}/community/blogs/:id", "host": ["{{baseUrl}}"], "path": ["community", "blogs", ":id"] } } },
+        { "name": "Like/Unlike Blog", "request": { "method": "POST", "url": { "raw": "{{baseUrl}}/community/blogs/:id/like", "host": ["{{baseUrl}}"], "path": ["community", "blogs", ":id", "like"] } } },
+        { "name": "Bookmark/Unbookmark Blog", "request": { "method": "POST", "url": { "raw": "{{baseUrl}}/community/blogs/:id/bookmark", "host": ["{{baseUrl}}"], "path": ["community", "blogs", ":id", "bookmark"] } } },
+        { "name": "Add Comment", "request": { "method": "POST", "url": { "raw": "{{baseUrl}}/community/comments", "host": ["{{baseUrl}}"], "path": ["community", "comments"] } } },
+        { "name": "Update Comment", "request": { "method": "PUT", "url": { "raw": "{{baseUrl}}/community/comments/:id", "host": ["{{baseUrl}}"], "path": ["community", "comments", ":id"] } } },
+        { "name": "Delete Comment", "request": { "method": "DELETE", "url": { "raw": "{{baseUrl}}/community/comments/:id", "host": ["{{baseUrl}}"], "path": ["community", "comments", ":id"] } } },
+        { "name": "Like/Unlike Comment", "request": { "method": "POST", "url": { "raw": "{{baseUrl}}/community/comments/:id/like", "host": ["{{baseUrl}}"], "path": ["community", "comments", ":id", "like"] } } },
+        { "name": "Follow/Unfollow User", "request": { "method": "POST", "url": { "raw": "{{baseUrl}}/community/users/:id/follow", "host": ["{{baseUrl}}"], "path": ["community", "users", ":id", "follow"] } } },
+        { "name": "Get Suggested Users", "request": { "method": "GET", "url": { "raw": "{{baseUrl}}/community/users/suggested", "host": ["{{baseUrl}}"], "path": ["community", "users", "suggested"] } } },
+        { "name": "Get User Bookmarks", "request": { "method": "GET", "url": { "raw": "{{baseUrl}}/community/users/bookmarks", "host": ["{{baseUrl}}"], "path": ["community", "users", "bookmarks"] } } },
+        { "name": "Get Trending Content", "request": { "method": "GET", "url": { "raw": "{{baseUrl}}/community/trending", "host": ["{{baseUrl}}"], "path": ["community", "trending"] } } },
+        { "name": "Get Discovery Content", "request": { "method": "GET", "url": { "raw": "{{baseUrl}}/community/discover", "host": ["{{baseUrl}}"], "path": ["community", "discover"] } } }
+      ]
+    },
+    {
+      "name": "Questions",
+      "item": [
+        { "name": "Get All Questions", "request": { "method": "GET", "url": { "raw": "{{baseUrl}}/questions", "host": ["{{baseUrl}}"], "path": ["questions"] } } },
+        { "name": "Get Question Categories", "request": { "method": "GET", "url": { "raw": "{{baseUrl}}/questions/categories", "host": ["{{baseUrl}}"], "path": ["questions", "categories"] } } },
+        { "name": "Get Questions By User", "request": { "method": "GET", "url": { "raw": "{{baseUrl}}/questions/users/:id", "host": ["{{baseUrl}}"], "path": ["questions", "users", ":id"] } } },
+        { "name": "Get Question By ID", "request": { "method": "GET", "url": { "raw": "{{baseUrl}}/questions/:id", "host": ["{{baseUrl}}"], "path": ["questions", ":id"] } } },
+        { "name": "Get Question Comments", "request": { "method": "GET", "url": { "raw": "{{baseUrl}}/questions/:id/comments", "host": ["{{baseUrl}}"], "path": ["questions", ":id", "comments"] } } },
+        { "name": "Create Question", "request": { "method": "POST", "url": { "raw": "{{baseUrl}}/questions", "host": ["{{baseUrl}}"], "path": ["questions"] }, "body": { "mode": "raw", "raw": "{\n  \"title\": \"Sample Question\",\n  \"content\": \"Content\"\n}" } } },
+        { "name": "Update Question", "request": { "method": "PUT", "url": { "raw": "{{baseUrl}}/questions/:id", "host": ["{{baseUrl}}"], "path": ["questions", ":id"] }, "body": { "mode": "raw", "raw": "{\n  \"title\": \"Updated Question\",\n  \"content\": \"Updated Content\"\n}" } } },
+        { "name": "Delete Question", "request": { "method": "DELETE", "url": { "raw": "{{baseUrl}}/questions/:id", "host": ["{{baseUrl}}"], "path": ["questions", ":id"] } } },
+        { "name": "Add Comment to Question", "request": { "method": "POST", "url": { "raw": "{{baseUrl}}/questions/:id/comments", "host": ["{{baseUrl}}"], "path": ["questions", ":id", "comments"] }, "body": { "mode": "raw", "raw": "{\n  \"text\": \"Nice question!\"\n}" } } },
+        { "name": "Update Comment", "request": { "method": "PUT", "url": { "raw": "{{baseUrl}}/questions/comments/:id", "host": ["{{baseUrl}}"], "path": ["questions", "comments", ":id"] }, "body": { "mode": "raw", "raw": "{\n  \"text\": \"Updated comment\"\n}" } } },
+        { "name": "Delete Comment", "request": { "method": "DELETE", "url": { "raw": "{{baseUrl}}/questions/comments/:id", "host": ["{{baseUrl}}"], "path": ["questions", "comments", ":id"] } } },
+        { "name": "Like Comment", "request": { "method": "POST", "url": { "raw": "{{baseUrl}}/questions/comments/:id/like", "host": ["{{baseUrl}}"], "path": ["questions", "comments", ":id", "like"] } } }
+      ]
+    }
+  ],
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:8000/api/v1" }
+  ]
+} 

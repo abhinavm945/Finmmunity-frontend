@@ -1,8 +1,9 @@
-'use client';
+"use client";
 
-import { useState } from 'react';
-import { FiX } from 'react-icons/fi';
-import { demoPosts, demoBlogs, demoUsers } from '../../utils/demoData';
+import { useState } from "react";
+import { useSearchParams } from "next/navigation";
+import { FiX } from "react-icons/fi";
+import { api } from "../../utils/api";
 
 interface PostFormProps {
   open: boolean;
@@ -10,56 +11,76 @@ interface PostFormProps {
   isBlog?: boolean;
 }
 
-export default function PostForm({ open, setOpen, isBlog = false }: PostFormProps) {
-  const [title, setTitle] = useState('');
-  const [content, setContent] = useState('');
-  const [tags, setTags] = useState('');
+export default function PostForm({
+  open,
+  setOpen,
+  isBlog = false,
+}: PostFormProps) {
+  const [title, setTitle] = useState("");
+  const [content, setContent] = useState("");
+  const [tags, setTags] = useState("");
   const [image, setImage] = useState<File | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const searchParams = useSearchParams();
+  const userId = searchParams.get("id");
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const newId = Date.now().toString();
-    const user = demoUsers[0];
-    const imageUrl = image ? URL.createObjectURL(image) : '/images/placeholder-post.jpg';
-
-    if (isBlog) {
-      const newBlog = {
-        _id: newId,
-        userId: user._id,
-        username: user.username,
-        profilePicture: user.profilePicture,
-        title,
-        content,
-        image: imageUrl,
-        likes: [],
-        comments: [],
-        createdAt: new Date().toISOString(),
-        isBookmarked: false,
-      };
-      demoBlogs.push(newBlog);
-      user.blogs.push(newBlog);
-    } else {
-      const newPost = {
-        _id: newId,
-        userId: user._id,
-        username: user.username,
-        profilePicture: user.profilePicture,
-        content,
-        image: imageUrl,
-        likes: [],
-        comments: [],
-        createdAt: new Date().toISOString(),
-        isBookmarked: false,
-      };
-      demoPosts.push(newPost);
-      user.posts.push(newPost);
+    if (!userId) {
+      setError("User ID not found in URL!");
+      return;
     }
 
-    setTitle('');
-    setContent('');
-    setTags('');
-    setImage(null);
-    setOpen(false);
+    setLoading(true);
+    setError("");
+
+    try {
+      const formData = new FormData();
+      formData.append("content", content);
+
+      if (isBlog) {
+        formData.append("title", title);
+        if (tags) formData.append("tags", tags);
+      }
+
+      if (image) {
+        formData.append("image", image);
+      }
+
+      let response;
+      if (isBlog) {
+        response = await api.community.blogs.create(formData);
+        console.log("Create blog response:", response);
+      } else {
+        response = await api.community.posts.create(formData);
+        console.log("Create post response:", response);
+      }
+
+      if (response.success) {
+        alert(
+          isBlog ? "Blog shared successfully!" : "Post created successfully!"
+        );
+        setTitle("");
+        setContent("");
+        setTags("");
+        setImage(null);
+        setOpen(false);
+        // Optionally refresh the page or update the feed
+        window.location.reload();
+      } else {
+        setError(
+          response.error?.message ||
+            `Failed to create ${isBlog ? "blog" : "post"}`
+        );
+      }
+    } catch (err: Error) {
+      setError(err.message || `Error creating ${isBlog ? "blog" : "post"}`);
+      console.error(`Error creating ${isBlog ? "blog" : "post"}:`, err);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -74,7 +95,9 @@ export default function PostForm({ open, setOpen, isBlog = false }: PostFormProp
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
       <div className="bg-white rounded-lg w-full max-w-2xl">
         <div className="flex justify-between items-center border-b p-4">
-          <h3 className="font-bold">{isBlog ? 'Share Market Analysis' : 'Create Post'}</h3>
+          <h3 className="font-bold">
+            {isBlog ? "Share Market Analysis" : "Create Post"}
+          </h3>
           <button onClick={() => setOpen(false)}>
             <FiX className="text-xl" />
           </button>
@@ -94,7 +117,11 @@ export default function PostForm({ open, setOpen, isBlog = false }: PostFormProp
           )}
           <div className="mb-4">
             <textarea
-              placeholder={isBlog ? 'Share your detailed analysis...' : 'What’s on your mind?'}
+              placeholder={
+                isBlog
+                  ? "Share your detailed analysis..."
+                  : "What's on your mind?"
+              }
               className="w-full p-2 border border-gray-300 rounded-lg h-40 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               value={content}
               onChange={(e) => setContent(e.target.value)}
@@ -111,21 +138,41 @@ export default function PostForm({ open, setOpen, isBlog = false }: PostFormProp
               />
             </div>
           )}
-          <div className="mb-4">
-            <input
-              type="text"
-              placeholder="Tags (comma separated) e.g. stocks, tech, earnings"
-              className="w-full p-2 border border-gray-300 rounded-lg"
-              value={tags}
-              onChange={(e) => setTags(e.target.value)}
-            />
-          </div>
-          <div className="flex justify-end">
+          {isBlog && (
+            <div className="mb-4">
+              <input
+                type="text"
+                placeholder="Tags (comma-separated)"
+                className="w-full p-2 border border-gray-300 rounded-lg"
+                value={tags}
+                onChange={(e) => setTags(e.target.value)}
+              />
+            </div>
+          )}
+          {error && (
+            <div className="mb-4 p-2 bg-red-100 border border-red-400 text-red-700 rounded">
+              {error}
+            </div>
+          )}
+          <div className="flex justify-end gap-2">
+            <button
+              type="button"
+              onClick={() => setOpen(false)}
+              className="px-4 py-2 text-gray-600 hover:text-gray-800"
+              disabled={loading}
+            >
+              Cancel
+            </button>
             <button
               type="submit"
-              className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+              className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 disabled:opacity-50"
+              disabled={loading}
             >
-              {isBlog ? 'Publish Analysis' : 'Post'}
+              {loading
+                ? "Creating..."
+                : isBlog
+                ? "Share Analysis"
+                : "Create Post"}
             </button>
           </div>
         </form>

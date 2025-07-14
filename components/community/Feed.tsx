@@ -1,63 +1,81 @@
-'use client';
+"use client";
 
-import { useState } from 'react';
-import PostList from './PostList';
-import BlogList from './BlogList';
-import { demoUsers, demoPosts, demoBlogs, Post, Blog } from '../../utils/demoData';
-import { usePathname } from 'next/navigation';
-import BlogCard from './BlogCard';
-import PostCard from './PostCard';
+import { useState } from "react";
+import { useSearchParams, useRouter } from "next/navigation";
+import PostList from "./PostList";
+import BlogList from "./BlogList";
+import PostCard from "./PostCard";
+import BlogCard from "./BlogCard";
+import { useSelector } from "react-redux";
 
-// Mock logged-in user
-const currentUser = demoUsers[0];
+interface FeedProps {
+  userId?: string;
+}
 
-export default function Feed() {
-  const [activeTab, setActiveTab] = useState('Blogs');
-  const pathname = usePathname();
+export default function Feed({ userId }: FeedProps) {
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  const urlTab = searchParams.get("tab");
 
-  // Get bookmarked items for Watchlist
-  const bookmarkedItems: Array<Post | Blog> = currentUser.bookmarks
-    .map((bookmark) => {
-      if (bookmark.type === 'post') {
-        return demoPosts.find((post) => post._id === bookmark.id);
-      } else {
-        return demoBlogs.find((blog) => blog._id === bookmark.id);
-      }
-    })
-    .filter((item): item is Post | Blog => item !== undefined);
+  const [activeTab, setActiveTab] = useState(urlTab || "Blogs");
+  const blogs = useSelector((state) => state.community.blogs);
+  const posts = useSelector((state) => state.community.posts);
+
+  // Get bookmarked items for Watchlist (this would need to be fetched from backend)
+  const bookmarkedItems = [
+    { id: 1, title: "Bitcoin Analysis", type: "blog" },
+    { id: 2, title: "Market Update", type: "post" },
+  ];
+
+  // Update URL parameters when tab changes
+  const handleTabChange = (tab: string) => {
+    setActiveTab(tab);
+    const params = new URLSearchParams();
+    if (userId) params.set("id", userId);
+    if (tab !== "Blogs") params.set("tab", tab);
+
+    const newURL = params.toString()
+      ? `/community?${params.toString()}`
+      : "/community";
+    router.push(newURL);
+  };
 
   return (
     <>
       <div className="flex items-center justify-center gap-8 text-sm border-b">
-        {['Blogs', 'Posts', 'Watchlist'].map((tab) => (
+        {["Blogs", "Posts", "Watchlist"].map((tab) => (
           <button
             key={tab}
             className={`py-4 px-2 font-medium ${
-              activeTab === tab ? 'text-blue-600 border-b-2 border-blue-600' : 'text-gray-500 hover:text-gray-700'
+              activeTab === tab
+                ? "text-blue-600 border-b-2 border-blue-600"
+                : "text-gray-500 hover:text-gray-700"
             }`}
-            onClick={() => setActiveTab(tab)}
+            onClick={() => handleTabChange(tab)}
           >
             {tab}
           </button>
         ))}
       </div>
       <div className="my-4">
-        {activeTab === 'Posts' ? (
-          <PostList posts={demoPosts} />
-        ) : activeTab === 'Blogs' ? (
-          <BlogList blogs={demoBlogs} />
+        {activeTab === "Posts" ? (
+          <PostList posts={posts} />
+        ) : activeTab === "Blogs" ? (
+          <BlogList blogs={blogs} />
         ) : (
-          <div className="space-y-4 max-w-7xl mx-auto px-4 py-6">
+          <div className="space-y-4 max-w-7xl mx-auto">
             {bookmarkedItems.length > 0 ? (
               bookmarkedItems.map((item) =>
-                'title' in item ? (
-                  <BlogCard key={item._id} blog={item} />
+                "title" in item ? (
+                  <BlogCard key={item.id || item._id} blog={item} />
                 ) : (
-                  <PostCard key={item._id} post={item} />
+                  <PostCard key={item.id || item._id} post={item} />
                 )
               )
             ) : (
-              <p className="text-center text-gray-500">No items in watchlist.</p>
+              <p className="text-center text-gray-500">
+                No items in watchlist.
+              </p>
             )}
           </div>
         )}

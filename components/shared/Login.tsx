@@ -1,26 +1,75 @@
-'use client';
+"use client";
 
-import { useState } from 'react';
-import Link from 'next/link';
-import { motion } from 'framer-motion';
-import { FaLock, FaEnvelope, FaEye, FaEyeSlash, FaGoogle } from 'react-icons/fa';
+import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
+import Link from "next/link";
+import { motion } from "framer-motion";
+import { useDispatch, useSelector } from "react-redux";
+import { loginUser, clearUserError } from "../../redux/userSlice";
+import {
+  FaLock,
+  FaEnvelope,
+  FaEye,
+  FaEyeSlash,
+  FaGoogle,
+} from "react-icons/fa";
 
 export default function LoginPage() {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
+  const [isClient, setIsClient] = useState(false);
+  const router = useRouter();
+  const dispatch = useDispatch();
+  const { loading, error, user } = useSelector((state) => state.user);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  // Prevent hydration issues
+  useEffect(() => {
+    setIsClient(true);
+  }, []);
+
+  // Redirect if already authenticated
+  useEffect(() => {
+    if (isClient && user && !loading) {
+      router.push("/");
+    }
+  }, [isClient, user, loading, router]);
+
+  // Clear error when component unmounts
+  useEffect(() => {
+    return () => {
+      dispatch(clearUserError());
+    };
+  }, [dispatch]);
+
+  const handleLoginSubmit = async (e) => {
     e.preventDefault();
-    // Handle email/password login logic here
-    console.log('Login submitted', { email, password });
+    try {
+      const result = await dispatch(loginUser({ email, password }));
+      if (loginUser.fulfilled.match(result)) {
+        const userId = result.payload?.id;
+        setTimeout(() => {
+          if (userId) {
+            router.push(`/?id=${userId}`);
+          } else {
+            router.push("/");
+          }
+        }, 100);
+      }
+    } catch (error) {
+      console.error("Login error:", error);
+    }
   };
 
   const handleGoogleLogin = () => {
-    // Handle Google OAuth login logic here
-    console.log('Continue with Google clicked');
-    // Example: window.location.href = '/api/auth/google';
+    // Implement Google login later if needed
+    console.log("Continue with Google clicked");
   };
+
+  // Don't render until client-side to prevent hydration issues
+  if (!isClient) {
+    return null;
+  }
 
   return (
     <div className="fixed inset-0 bg-gray-500 bg-opacity-50 backdrop-blur-md flex items-center justify-center z-50 min-h-screen">
@@ -41,11 +90,14 @@ export default function LoginPage() {
         </div>
 
         {/* Form */}
-        <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
+        <form className="mt-8 space-y-6" onSubmit={handleLoginSubmit}>
           <div className="space-y-4">
             {/* Email Input */}
             <div>
-              <label htmlFor="email" className="block text-sm font-medium text-gray-700">
+              <label
+                htmlFor="email"
+                className="block text-sm font-medium text-gray-700"
+              >
                 Email address
               </label>
               <div className="mt-1 relative">
@@ -71,7 +123,10 @@ export default function LoginPage() {
 
             {/* Password Input */}
             <div>
-              <label htmlFor="password" className="block text-sm font-medium text-gray-700">
+              <label
+                htmlFor="password"
+                className="block text-sm font-medium text-gray-700"
+              >
                 Password
               </label>
               <div className="mt-1 relative">
@@ -83,7 +138,7 @@ export default function LoginPage() {
                   <input
                     id="password"
                     name="password"
-                    type={showPassword ? 'text' : 'password'}
+                    type={showPassword ? "text" : "password"}
                     autoComplete="current-password"
                     required
                     className="flex-grow outline-none placeholder-gray-400 text-sm"
@@ -95,7 +150,9 @@ export default function LoginPage() {
                     type="button"
                     className="text-gray-400 ml-2"
                     onClick={() => setShowPassword(!showPassword)}
-                    aria-label={showPassword ? 'Hide password' : 'Show password'}
+                    aria-label={
+                      showPassword ? "Hide password" : "Show password"
+                    }
                   >
                     {showPassword ? <FaEyeSlash /> : <FaEye />}
                   </button>
@@ -104,14 +161,22 @@ export default function LoginPage() {
             </div>
           </div>
 
+          {/* Error Message */}
+          {error && (
+            <div className="text-red-500 text-sm text-center bg-red-50 p-2 rounded-lg">
+              {error}
+            </div>
+          )}
+
           {/* Submit Button */}
           <motion.button
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
             type="submit"
-            className="w-full px-4 py-2 bg-gradient-to-r from-blue-500 to-purple-500 text-white text-sm font-medium rounded-full shadow-md hover:shadow-lg transition-all"
+            disabled={loading}
+            className="w-full px-4 py-2 bg-gradient-to-r from-blue-500 to-purple-500 text-white text-sm font-medium rounded-full shadow-md hover:shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            Log in
+            {loading ? "Logging in..." : "Log in"}
           </motion.button>
         </form>
 
@@ -134,12 +199,12 @@ export default function LoginPage() {
           >
             Forgot password?
           </Link>
-          <Link
-            href="/signup"
-            className="font-medium text-gray-600 hover:text-blue-600 transition-colors"
-          >
-            Sign up
-          </Link>
+          <p className="text-gray-600 text-sm">
+            Don&apos;t have an account?{" "}
+            <Link href="/signup" className="text-blue-600 hover:underline">
+              Sign up
+            </Link>
+          </p>
         </div>
       </motion.div>
     </div>
