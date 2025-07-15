@@ -1,6 +1,6 @@
 "use client";
 
-import { ReactNode } from "react";
+import { ReactNode, useEffect, useState } from "react";
 import { useAuth } from "../../hooks/useAuth";
 import LoadingSpinner from "./LoadingSpinner";
 import { motion } from "framer-motion";
@@ -11,16 +11,20 @@ interface ProtectedRouteProps {
 }
 
 export default function ProtectedRoute({ children }: ProtectedRouteProps) {
-  const { user, loading } = useAuth();
+  const { user, isLoading } = useAuth();
+  const [isClient, setIsClient] = useState(false);
+  useEffect(() => {
+    setIsClient(true);
+  }, []);
 
-  if (loading) {
+  if (!isClient) return null;
+  if (isLoading) {
     return (
       <div className="flex justify-center items-center min-h-screen">
         <LoadingSpinner />
       </div>
     );
   }
-
   if (!user) {
     return (
       <div className="max-h-screen bg-gray-50 flex flex-col items-center justify-center fixed top-0 left-0 right-0 bottom-0">
@@ -65,6 +69,5 @@ export default function ProtectedRoute({ children }: ProtectedRouteProps) {
       </div>
     );
   }
-
   return <>{children}</>;
 }

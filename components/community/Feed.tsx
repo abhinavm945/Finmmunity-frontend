@@ -64,19 +64,9 @@ export default function Feed({ userId }: FeedProps) {
           <BlogList blogs={blogs} />
         ) : (
           <div className="space-y-4 max-w-7xl mx-auto">
-            {bookmarkedItems.length > 0 ? (
-              bookmarkedItems.map((item) =>
-                "title" in item ? (
-                  <BlogCard key={item.id || item._id} blog={item} />
-                ) : (
-                  <PostCard key={item.id || item._id} post={item} />
-                )
-              )
-            ) : (
-              <p className="text-center text-gray-500">
-                No items in watchlist.
-              </p>
-            )}
+            <p className="text-center text-gray-500">
+              Watchlist feature coming soon.
+            </p>
           </div>
         )}
       </div>

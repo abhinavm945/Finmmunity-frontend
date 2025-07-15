@@ -41,6 +41,7 @@ export interface Blog {
   title: string;
   content: string;
   image?: string;
+  gifUrl?: string;
   tags: string[];
   category: string;
   likes: string[];

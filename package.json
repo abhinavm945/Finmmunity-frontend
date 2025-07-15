@@ -10,16 +10,20 @@
     "lint": "next lint"
   },
   "dependencies": {
+    "@giphy/js-fetch-api": "^5.7.0",
     "@headlessui/react": "^2.2.4",
     "@reduxjs/toolkit": "^2.8.2",
     "axios": "^1.10.0",
+    "emoji-picker-react": "^4.13.1",
     "framer-motion": "^12.12.1",
+    "html-react-parser": "^5.2.5",
     "lucide-react": "^0.511.0",
     "next": "15.3.2",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "react-icons": "^5.5.0",
     "react-redux": "^9.2.0",
+    "react-toastify": "^11.0.5",
     "redux-persist": "^6.0.0",
     "socket.io-client": "^4.8.1"
   },

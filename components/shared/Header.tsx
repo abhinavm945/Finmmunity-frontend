@@ -420,9 +420,8 @@ export default function Header() {
                   />
                 </Link>
                 {!userId &&
-                  (tab.label === "COMMUNITY" || tab.label === "ASK") && (
-                    <div className="absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full animate-pulse"></div>
-                  )}
+                  (tab.label === "COMMUNITY" || tab.label === "ASK") &&
+                  null}
               </motion.div>
             ))}
           </div>

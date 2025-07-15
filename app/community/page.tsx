@@ -6,12 +6,14 @@ import { fetchPosts, fetchBlogs } from "../../redux/communitySlice";
 import Feed from "../../components/community/Feed";
 import ProtectedRoute from "../../components/shared/ProtectedRoute";
 import LoadingSpinner from "../../components/shared/LoadingSpinner";
+import { useAuth } from "../../hooks/useAuth";
 
 export default function CommunityPage() {
   const dispatch = useDispatch();
   const { posts, blogs, loading, error } = useSelector(
     (state) => state.community
   );
+  const { userId } = useAuth();
 
   useEffect(() => {
     dispatch(fetchPosts());
@@ -52,7 +54,7 @@ export default function CommunityPage() {
   return (
     <ProtectedRoute>
       <div>
-        <Feed posts={posts} blogs={blogs} />
+        <Feed userId={userId} posts={posts} blogs={blogs} />
       </div>
     </ProtectedRoute>
   );

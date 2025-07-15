@@ -1,42 +1,77 @@
-"use client";
-
-import { useState } from "react";
+/* eslint-disable react/prop-types */
+import { useState, useEffect } from "react";
 import { useSelector } from "react-redux";
-import Image from "next/image";
-import Link from "next/link";
-import { FaRegHeart, FaHeart } from "react-icons/fa";
-import { MessageCircle, Bookmark, BookmarkCheck } from "lucide-react";
-import { formatDate } from "../../utils/formatDate";
-import { Post } from "../../utils/types";
-import { useCommunity } from "../../hooks/useApi";
-import CommentDialog from "./CommentDialog";
+import { Bookmark, BookmarkCheck, MessageCircle, Send } from "lucide-react";
+import { FaHeart, FaRegHeart } from "react-icons/fa";
 import Avatar from "../shared/Avatar";
+import { motion } from "framer-motion";
+import CommentDialog from "./CommentDialog";
+import Image from "next/image";
+import { Post, User } from "../../utils/types";
+import axios from "axios";
+import { config } from "../../utils/config";
 
 interface PostCardProps {
   post: Post;
 }
 
-export default function PostCard({ post }: PostCardProps) {
-  const user = useSelector((state) => state.user?.user);
-  const { posts, bookmarks } = useCommunity();
+const PostCard = ({ post }: PostCardProps) => {
+  const user = useSelector(
+    (state: { user: { user: User } }) => state.user?.user
+  );
 
-  const [isLiked, setIsLiked] = useState(post.likes.includes(user?.id || ""));
-  const [likeCount, setLikeCount] = useState(post.likes.length);
+  // Use author info from post.user
+  const author: { profilePicture?: string; username: string } = post.user;
+
   const [isBookmarked, setIsBookmarked] = useState(post.isBookmarked || false);
-  const [openCommentDialog, setOpenCommentDialog] = useState(false);
+  const [showComments, setShowComments] = useState(false);
+  const [text, setText] = useState("");
+  // Change the likes state type to (string | { userId: string })[]
+  const [likes, setLikes] = useState<(string | { userId: string })[]>(
+    post.likes
+  );
+  const liked =
+    !!user &&
+    likes.some((like) =>
+      typeof like === "string" ? like === user.id : like.userId === user.id
+    );
+
+  const changeEventHandler = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setText(e.target.value);
+  };
+
+  const commentHandler = () => {
+    setText("");
+  };
 
   const handleLike = async () => {
     if (!user) return;
-
+    const token =
+      typeof window !== "undefined" ? localStorage.getItem("token") : null;
     try {
-      if (isLiked) {
-        await posts.unlike.execute({ id: post.id });
-        setLikeCount((prev) => prev - 1);
-      } else {
-        await posts.like.execute({ id: post.id });
-        setLikeCount((prev) => prev + 1);
+      const res = await axios.post(
+        `${config.api.baseUrl}/community/posts/${post.id}/like`,
+        {},
+        {
+          headers: {
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          },
+          withCredentials: true,
+        }
+      );
+      if (res.data.success) {
+        if (res.data.liked) {
+          setLikes((prev) => [...prev, { userId: user.id }]);
+        } else {
+          setLikes((prev) =>
+            prev.filter((like) =>
+              typeof like === "string"
+                ? like !== user.id
+                : like.userId !== user.id
+            )
+          );
+        }
       }
-      setIsLiked(!isLiked);
     } catch (error) {
       console.error("Error toggling like:", error);
     }
@@ -44,77 +79,138 @@ export default function PostCard({ post }: PostCardProps) {
 
   const handleBookmark = async () => {
     if (!user) return;
+    setIsBookmarked((prev: boolean) => !prev);
+  };
 
-    try {
-      if (isBookmarked) {
-        await bookmarks.remove.execute({ id: post.id });
-      } else {
-        await bookmarks.add.execute({ type: "POST", postId: post.id });
-      }
-      setIsBookmarked(!isBookmarked);
-    } catch (error) {
-      console.error("Error toggling bookmark:", error);
-    }
+  const handleShare = () => {
+    navigator.clipboard.writeText(window.location.href + `/post/${post.id}`);
+  };
+
+  const handleShowComments = () => {
+    console.log("Post passed to CommentDialog:", post);
+    setShowComments(true);
   };
 
   return (
-    <div className="bg-white rounded-lg shadow-md p-4 max-w-xl mx-auto">
-      <div className="flex items-center gap-3">
-        <Link href={`/profile/${post.user.id}`}>
-          <Avatar image={post.user.profilePicture} size="md" />
-        </Link>
-        <div>
-          <Link href={`/profile/${post.user.id}`}>
-            <p className="font-semibold text-gray-800 hover:underline">
-              {post.user.username}
-            </p>
-          </Link>
-          <p className="text-sm text-gray-500">{formatDate(post.createdAt)}</p>
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.3 }}
+      className="w-full max-w-2xl mx-auto p-4 sm:p-6 mb-8 bg-white rounded-2xl shadow-lg border border-gray-100 hover:shadow-2xl transition-shadow duration-300 group"
+    >
+      {/* Post Author and Date */}
+      <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center gap-3">
+          <Avatar
+            size="xs"
+            image={author.profilePicture || "/images/default-avatar.png"}
+          />
+          <span className="font-medium text-gray-700">{author.username}</span>
         </div>
+        <span className="text-xs text-gray-400">
+          {post.createdAt ? new Date(post.createdAt).toLocaleString() : ""}
+        </span>
       </div>
-      <p className="mt-3 text-gray-700">{post.content}</p>
+
+      {/* Post Image */}
       {post.image && (
-        <div className="mt-3">
+        <div className="w-full rounded-xl overflow-hidden mb-4">
           <Image
-            src={post.image}
-            alt="Post image"
-            width={500}
-            height={300}
-            className="rounded-md object-cover w-full"
+            src={post.image || "/images/placeholder-post.jpg"}
+            alt={post.content || "Post image"}
+            width={900}
+            height={500}
+            className="w-full h-auto object-contain max-h-[400px] bg-gray-50"
+            style={{ maxHeight: "400px" }}
+            priority
           />
         </div>
       )}
-      <div className="flex items-center justify-between mt-4">
+
+      {/* Post Caption (Content) */}
+      <p className="text-base sm:text-lg text-gray-800 mb-2 break-words leading-relaxed">
+        <span className="font-semibold mr-2">{author.username}</span>
+        {post.content}
+      </p>
+
+      {/* Post Actions */}
+      <div className="flex flex-wrap justify-between items-center mb-2 mt-3 gap-2">
         <div className="flex items-center gap-4">
-          <button
-            onClick={handleLike}
-            className="flex items-center gap-1 text-gray-600 hover:text-red-500"
-          >
-            {isLiked ? <FaHeart className="text-red-500" /> : <FaRegHeart />}
-            <span>{likeCount}</span>
-          </button>
-          <button
-            onClick={() => setOpenCommentDialog(true)}
-            className="flex items-center gap-1 text-gray-600 hover:text-blue-500"
-          >
-            <MessageCircle size={20} />
-            <span>{post.comments.length}</span>
-          </button>
+          {liked ? (
+            <FaHeart
+              size="23px"
+              className="cursor-pointer text-red-600 hover:text-gray-600 transition-colors duration-200"
+              onClick={handleLike}
+            />
+          ) : (
+            <FaRegHeart
+              size="23px"
+              className="cursor-pointer hover:text-gray-600 transition-colors duration-200"
+              onClick={handleLike}
+            />
+          )}
+          <MessageCircle
+            className="cursor-pointer hover:text-blue-500 transition-colors duration-200"
+            onClick={handleShowComments}
+          />
+          <Send
+            className="cursor-pointer hover:text-blue-500 transition-colors duration-200"
+            onClick={handleShare}
+          />
         </div>
-        <button
-          onClick={handleBookmark}
-          className="text-gray-600 hover:text-blue-500"
-        >
-          {isBookmarked ? <BookmarkCheck size={20} /> : <Bookmark size={20} />}
-        </button>
+        {isBookmarked ? (
+          <BookmarkCheck
+            className="cursor-pointer text-blue-600 hover:text-gray-600 transition-colors duration-200"
+            onClick={handleBookmark}
+          />
+        ) : (
+          <Bookmark
+            className="cursor-pointer hover:text-gray-600 transition-colors duration-200"
+            onClick={handleBookmark}
+          />
+        )}
       </div>
-      {openCommentDialog && (
-        <CommentDialog
-          open={openCommentDialog}
-          setOpen={() => setOpenCommentDialog(false)}
-          post={post}
+
+      {/* Likes and Comments Count */}
+      <div className="my-2 flex flex-wrap gap-4 text-sm text-gray-600">
+        <span className="font-medium">{likes.length} likes</span>
+        {post.comments?.length > 0 && (
+          <span
+            className="cursor-pointer hover:underline"
+            onClick={() => setShowComments(true)}
+          >
+            View all {post.comments.length} comments
+          </span>
+        )}
+      </div>
+
+      {/* Comments Dialog */}
+      <CommentDialog
+        open={showComments}
+        setOpen={setShowComments}
+        post={post}
+      />
+
+      {/* Add Comment */}
+      <div className="flex items-center justify-between mt-2 border-t pt-3">
+        <input
+          type="text"
+          placeholder="Add a comment..."
+          value={text}
+          onChange={changeEventHandler}
+          className="outline-none text-sm w-full bg-transparent px-2 py-1"
         />
-      )}
-    </div>
+        {text && (
+          <span
+            onClick={commentHandler}
+            className="text-[#3badf8] cursor-pointer ml-2 font-semibold"
+          >
+            Post
+          </span>
+        )}
+      </div>
+    </motion.div>
   );
-}
+};
+
+export default PostCard;

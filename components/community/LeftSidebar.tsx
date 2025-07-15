@@ -15,7 +15,8 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import Avatar from "../shared/Avatar";
-import PostForm from "./PostForm";
+import CreatePostDialog from "./CreatePostDialog";
+import CreateBlogDialog from "./CreateBlogDialog";
 import { usePathname, useSearchParams } from "next/navigation";
 
 export default function LeftSidebar() {
@@ -219,11 +220,16 @@ export default function LeftSidebar() {
         </div>
       </div>
 
-      {createType && (
-        <PostForm
+      {createType === "post" && (
+        <CreatePostDialog
           open={!!createType}
           setOpen={() => setCreateType(null)}
-          isBlog={createType === "blog"}
+        />
+      )}
+      {createType === "blog" && (
+        <CreateBlogDialog
+          open={!!createType}
+          setOpen={() => setCreateType(null)}
         />
       )}
     </>

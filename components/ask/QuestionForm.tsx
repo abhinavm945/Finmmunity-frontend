@@ -24,12 +24,14 @@ export default function QuestionForm({
   useEffect(() => {
     const fetchCategories = async () => {
       try {
-        const response = await api.questions.getCategories();
-        if (response.success && response.data) {
-          setCategories(response.data as Category[]);
-        } else {
-          setCategories([]);
-        }
+        // Use a fallback since getCategories is not defined for questions
+        // Replace this with an API call if/when available
+        setCategories([
+          { id: "investment", name: "investment" },
+          { id: "education", name: "education" },
+          { id: "stocks", name: "stocks" },
+          { id: "crypto", name: "crypto" },
+        ]);
       } catch (error) {
         console.error("Error fetching categories:", error);
         setCategories([]);

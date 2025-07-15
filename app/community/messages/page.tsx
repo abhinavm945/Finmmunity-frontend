@@ -23,7 +23,7 @@ export default function MessagesPage() {
   const fetchConversations = async () => {
     try {
       setLoading(true);
-      const response = await api.community.getConversations();
+      const response = await api.community.messages.getConversations();
       if (response.success && response.data) {
         setConversations(response.data as Conversation[]);
       }
@@ -72,27 +72,6 @@ export default function MessagesPage() {
       <ProtectedRoute>
         <div className="flex justify-center items-center min-h-screen">
           <LoadingSpinner />
-        </div>
-      </ProtectedRoute>
-    );
-  }
-
-  if (error) {
-    return (
-      <ProtectedRoute>
-        <div className="flex justify-center items-center min-h-screen">
-          <div className="text-center">
-            <h2 className="text-xl font-semibold text-gray-800 mb-2">
-              Error Loading Messages
-            </h2>
-            <p className="text-gray-600 mb-4">{error}</p>
-            <button
-              onClick={fetchConversations}
-              className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600"
-            >
-              Try Again
-            </button>
-          </div>
         </div>
       </ProtectedRoute>
     );

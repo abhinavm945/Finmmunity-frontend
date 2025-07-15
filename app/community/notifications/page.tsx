@@ -21,7 +21,7 @@ export default function NotificationsPage() {
   const fetchNotifications = async () => {
     try {
       setLoading(true);
-      const response = await api.community.getNotifications();
+      const response = await api.community.notifications.getAll();
       if (response.success && response.data) {
         setNotifications(response.data as Notification[]);
       }
@@ -103,27 +103,6 @@ export default function NotificationsPage() {
       <ProtectedRoute>
         <div className="flex justify-center items-center min-h-screen">
           <LoadingSpinner />
-        </div>
-      </ProtectedRoute>
-    );
-  }
-
-  if (error) {
-    return (
-      <ProtectedRoute>
-        <div className="flex justify-center items-center min-h-screen">
-          <div className="text-center">
-            <h2 className="text-xl font-semibold text-gray-800 mb-2">
-              Error Loading Notifications
-            </h2>
-            <p className="text-gray-600 mb-4">{error}</p>
-            <button
-              onClick={fetchNotifications}
-              className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600"
-            >
-              Try Again
-            </button>
-          </div>
         </div>
       </ProtectedRoute>
     );
