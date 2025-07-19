@@ -11,11 +11,12 @@ import { fetchNews, clearNews } from "../../redux/newsSlice";
 import { api } from "../../utils/api";
 import { NewsItem } from "../../types/news";
 import { Category } from "../../types/category";
+import { getUserIdFromToken } from "../../utils/getUserIdFromToken";
 
 export default function NewsList() {
   const searchParams = useSearchParams();
   const router = useRouter();
-  const userId = searchParams.get("id");
+  const userId = getUserIdFromToken();
   const urlCategory = searchParams.get("category");
   const urlSearch = searchParams.get("search");
   const urlPage = searchParams.get("page");
@@ -53,8 +54,9 @@ export default function NewsList() {
     if (activeCategory && activeCategory !== "all")
       params.category = activeCategory;
     if (debouncedSearchQuery) params.search = debouncedSearchQuery;
+    if (userId) params.userId = userId;
     return params;
-  }, [currentPage, activeCategory, debouncedSearchQuery, itemsPerPage]);
+  }, [currentPage, activeCategory, debouncedSearchQuery, itemsPerPage, userId]);
 
   // Create a string key for the current params to check if we need to fetch
   const paramsKey = useMemo(

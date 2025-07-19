@@ -1,10 +1,8 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { useSearchParams } from "next/navigation";
-import Link from "next/link";
 import { Post, Blog } from "../../utils/types";
-import { api } from "../../utils/api";
 import Avatar from "./Avatar";
 import LoadingSpinner from "./LoadingSpinner";
 import CommentDialog from "../community/CommentDialog";
@@ -12,37 +10,96 @@ import BlogCommentDialog from "../community/BlogCommentDialog";
 import PostCard from "../community/PostCard";
 import BlogCard from "../community/BlogCard";
 import RightSidebar from "../community/RightSidebar";
+import { useDispatch, useSelector } from "react-redux";
+import type { RootState } from "../../redux/store";
+import type { AppDispatch } from "../../redux/store";
+import {
+  fetchUserProfile,
+  fetchFollowers,
+  fetchFollowing,
+  followOrUnfollowUser,
+  unfollowUser,
+  removeFollower,
+  clearUserError,
+} from "../../redux/userSlice";
+import { fetchUserBlogs, fetchUserPosts } from "../../redux/communitySlice";
 import { FaRegHeart } from "react-icons/fa";
-import { MdSettings } from "react-icons/md";
 import { MessageCircle } from "lucide-react";
-
-interface UserProfileData {
-  id: string;
-  username: string;
-  email: string;
-  bio?: string;
-  profilePicture?: string;
-  followers: UserProfileData[];
-  following: UserProfileData[];
-  posts: Post[];
-  blogs: Blog[];
-}
+import { MdSettings } from "react-icons/md";
+import { useRouter } from "next/navigation";
+import { motion, AnimatePresence } from "framer-motion";
 
 export default function UserProfile() {
+  const dispatch: AppDispatch = useDispatch();
+  const searchParams = useSearchParams();
+  const userId = searchParams.get("id");
+  const router = useRouter();
+
+  // Redux selectors
+  const user = useSelector((state: RootState) => state.user.user);
+  const profile = useSelector(
+    (state: RootState) => state.user.profile
+  ) as unknown;
+  const followers = useSelector(
+    (state: RootState) => state.user.followers
+  ) as unknown;
+  const following = useSelector(
+    (state: RootState) => state.user.following
+  ) as unknown;
+
+  // Safe array access with fallbacks
+  const safeFollowers = Array.isArray(followers) ? followers : [];
+  const safeFollowing = Array.isArray(following) ? following : [];
+  const loading = useSelector((state: RootState) => state.user.loading);
+  const error = useSelector((state: RootState) => state.user.error);
+
+  // Community selectors for user's blogs and posts
+  const userBlogsState = useSelector(
+    (state: RootState) => state.community.userBlogs
+  );
+  const userPostsState = useSelector(
+    (state: RootState) => state.community.userPosts
+  );
+
+  // Memoized data extraction
+  const userBlogs = useMemo(() => {
+    return userBlogsState?.data || [];
+  }, [userBlogsState]);
+
+  const userPosts = useMemo(() => {
+    return userPostsState?.data || [];
+  }, [userPostsState]);
+
+  const isMyProfile = user && userId === user.id;
+  const displayProfile = isMyProfile ? user : profile;
+
+  // Local state for UI modals only
   const [activeTab, setActiveTab] = useState("recent-content");
   const [selectedPost, setSelectedPost] = useState<Post | null>(null);
   const [selectedBlog, setSelectedBlog] = useState<Blog | null>(null);
-  const [userProfile, setUserProfile] = useState<UserProfileData | null>(null);
-  const [userPosts, setUserPosts] = useState<Post[]>([]);
-  const [userBlogs, setUserBlogs] = useState<Blog[]>([]);
-  const [followers, setFollowers] = useState<UserProfileData[]>([]);
-  const [following, setFollowing] = useState<UserProfileData[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [loadingFollow, setLoadingFollow] = useState(false);
-  const [isFollowing, setIsFollowing] = useState(false);
-  const [error, setError] = useState("");
-  const searchParams = useSearchParams();
-  const userId = searchParams.get("id");
+  const [showFollowersModal, setShowFollowersModal] = useState(false);
+  const [showFollowingModal, setShowFollowingModal] = useState(false);
+  const [followersLoading, setFollowersLoading] = useState(false);
+  const [followingLoading, setFollowingLoading] = useState(false);
+  const [buttonLoading, setButtonLoading] = useState(false);
+
+  const fetchedRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (userId && fetchedRef.current !== userId) {
+      dispatch(fetchUserProfile(userId));
+      dispatch(fetchFollowers(userId));
+      dispatch(fetchFollowing(userId));
+      // Fetch user's blogs and posts
+      dispatch(fetchUserBlogs(userId));
+      dispatch(fetchUserPosts(userId));
+      fetchedRef.current = userId;
+    }
+  }, [userId, dispatch]);
+
+  useEffect(() => {
+    // (Removed debug log)
+  }, [profile]);
 
   const handleTabChange = (tab: string) => setActiveTab(tab);
 
@@ -50,81 +107,48 @@ export default function UserProfile() {
   const handleCloseDialog = () => setSelectedPost(null);
   const handleCloseBlogDialog = () => setSelectedBlog(null);
 
-  useEffect(() => {
-    if (userId) {
-      fetchUserData();
-    }
-  }, [userId]);
-
-  const fetchUserData = async () => {
-    setLoading(true);
-    setError("");
-    try {
-      // Fetch user profile and related data in parallel
-      const [profileRes, postsRes, blogsRes, followersRes, followingRes] =
-        await Promise.all([
-          api.user.getProfile(userId!),
-          api.user.getPosts(userId!),
-          api.user.getBlogs(userId!),
-          api.user.getFollowers(userId!),
-          api.user.getFollowing(userId!),
-        ]);
-
-      console.log("Fetched user profile:", profileRes);
-      console.log("Fetched user posts:", postsRes);
-      console.log("Fetched user blogs:", blogsRes);
-      console.log("Fetched followers:", followersRes);
-      console.log("Fetched following:", followingRes);
-
-      if (profileRes.success && profileRes.data) {
-        setUserProfile(profileRes.data.user || profileRes.data);
-      }
-      if (postsRes.success && postsRes.data) {
-        setUserPosts(postsRes.data.posts || postsRes.data);
-      }
-      if (blogsRes.success && blogsRes.data) {
-        setUserBlogs(blogsRes.data.blogs || blogsRes.data);
-      }
-      if (followersRes.success && followersRes.data) {
-        setFollowers(followersRes.data.followers || followersRes.data);
-      }
-      if (followingRes.success && followingRes.data) {
-        setFollowing(followingRes.data.following || followingRes.data);
-      }
-    } catch (err: Error) {
-      setError(err.message || "Failed to fetch user data");
-      console.error("Error fetching user data:", err);
-    } finally {
-      setLoading(false);
-    }
+  const handleOpenFollowers = () => {
+    setShowFollowersModal(true);
   };
 
+  const handleOpenFollowing = () => {
+    setShowFollowingModal(true);
+  };
+
+  const handleNavigateToProfile = (userId: string) => {
+    setShowFollowersModal(false);
+    setShowFollowingModal(false);
+    router.push(`/community/profile?id=${userId}`);
+  };
+
+  // Follow/Unfollow logic
   const handleFollowOrUnfollow = async () => {
-    if (!userProfile) return;
-
-    setLoadingFollow(true);
-    try {
-      const response = await api.community.users.toggleFollow(userProfile.id);
-      console.log("Follow/unfollow response:", response);
-
-      if (response.success) {
-        setIsFollowing(!isFollowing);
-        // Refresh followers count
-        const followersRes = await api.user.getFollowers(userProfile.id);
-        if (followersRes.success && followersRes.data) {
-          setFollowers(followersRes.data.followers || followersRes.data);
-        }
-      }
-    } catch (err: Error) {
-      console.error("Error following/unfollowing:", err);
-    } finally {
-      setLoadingFollow(false);
+    if (
+      !displayProfile ||
+      typeof (displayProfile as any).id !== "string" ||
+      !(displayProfile as any).id
+    )
+      return;
+    setButtonLoading(true);
+    await dispatch(followOrUnfollowUser((displayProfile as any).id));
+    if (
+      typeof (displayProfile as any).id === "string" &&
+      (displayProfile as any).id
+    ) {
+      dispatch(fetchFollowers((displayProfile as any).id));
+      dispatch(fetchFollowing((displayProfile as any).id));
     }
+    setButtonLoading(false);
   };
+
+  // Button logic
+  const isLoggedInUserProfile =
+    user && displayProfile && (user as any).id === (displayProfile as any).id;
+  const isFollowing = displayProfile && (displayProfile as any).isFollowing;
 
   if (loading) {
     return (
-      <div className="flex justify-center items-center min-h-screen">
+      <div className="flex justify-center items-center min-h-screen overflow-x-hidden">
         <LoadingSpinner />
       </div>
     );
@@ -132,14 +156,22 @@ export default function UserProfile() {
 
   if (error) {
     return (
-      <div className="flex justify-center items-center min-h-screen">
+      <div className="flex justify-center items-center min-h-screen overflow-x-hidden top-0">
         <div className="text-center">
           <h2 className="text-xl font-semibold text-gray-800 mb-2">
             Error Loading Profile
           </h2>
           <p className="text-gray-600 mb-4">{error}</p>
           <button
-            onClick={fetchUserData}
+            onClick={() => {
+              dispatch(clearUserError());
+              fetchedRef.current = null;
+              if (userId) {
+                dispatch(fetchUserProfile(userId));
+                dispatch(fetchFollowers(userId));
+                dispatch(fetchFollowing(userId));
+              }
+            }}
             className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600"
           >
             Try Again
@@ -149,9 +181,9 @@ export default function UserProfile() {
     );
   }
 
-  if (!userProfile) {
+  if (!displayProfile) {
     return (
-      <div className="flex justify-center items-center min-h-screen">
+      <div className="flex justify-center items-center min-h-screen overflow-x-hidden">
         <div className="text-center">
           <h2 className="text-xl font-semibold text-gray-800 mb-2">
             User Not Found
@@ -164,100 +196,153 @@ export default function UserProfile() {
     );
   }
 
-  const isLoggedInUserProfile = false; // TODO: Compare with current user ID
-
-  const displayedPosts = activeTab === "posts" ? userPosts : [];
-  const displayedBlogs = activeTab === "blogs" ? userBlogs : [];
-
   return (
-    <div className="w-full">
-      <div className="flex flex-col gap-6 sm:gap-8 lg:gap-10">
-        <div className="flex flex-col md:flex-row items-center md:items-start gap-6 sm:gap-8">
+    <div className="flex flex-col lg:flex-row max-w-7xl mx-auto px-2 sm:px-4 md:px-8 gap-8 overflow-x-hidden">
+      {/* Left Section - Profile Info and Posts */}
+      <div className="flex flex-col gap-10 p-2 w-full lg:w-3/4">
+        {/* User Info Section */}
+        <div className="flex flex-col md:flex-row items-center md:items-start gap-4 md:gap-8">
+          {/* Profile Picture */}
           <section className="flex-shrink-0">
             <Avatar
               size="xl"
-              image={userProfile.profilePicture || "/images/default-avatar.png"}
+              image={
+                (displayProfile as any)?.profilePicture ||
+                "/images/default-avatar.png"
+              }
             />
           </section>
+
+          {/* Profile Details */}
           <section className="w-full text-center md:text-left">
-            <div className="flex flex-col gap-4 sm:gap-5">
-              <div className="flex flex-wrap items-center justify-center md:justify-start gap-3 cursor-pointer">
-                <span className="text-xl sm:text-2xl font-semibold">
-                  {userProfile.username}
+            <div className="flex flex-col gap-2 md:gap-5">
+              <div className="flex flex-wrap items-center justify-center md:justify-start gap-2 md:gap-3 cursor-pointer ">
+                <span className="text-lg md:text-2xl font-extrabold italic bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+                  {(displayProfile as any)?.username}
                 </span>
+                {/* Profile Action Buttons */}
                 {isLoggedInUserProfile ? (
-                  <div className="flex items-center gap-2">
-                    <Link href="/account/edit">
-                      <button className="hover:bg-gray-300 h-8 rounded-md bg-gray-200 px-4 cursor-pointer text-sm">
-                        Edit profile
-                      </button>
-                    </Link>
-                    <button className="hover:bg-gray-300 h-8 rounded-md bg-gray-200 px-4 cursor-pointer text-sm">
+                  <div className="flex items-center gap-1 md:gap-2 ">
+                    <button
+                      onClick={() =>
+                        router.push(
+                          `/community/editprofile?id=${
+                            (displayProfile as any)?.id
+                          }`
+                        )
+                      }
+                      className="hover:bg-gray-300 h-7 md:h-8 rounded-md bg-gray-200 px-2 md:px-4 cursor-pointer text-xs md:text-sm"
+                    >
+                      Edit profile
+                    </button>
+                    <button className="hover:bg-gray-300 h-7 md:h-8 rounded-md bg-gray-200 px-2 md:px-4 cursor-pointer text-xs md:text-sm">
                       View Archive
                     </button>
                     <MdSettings
-                      size={24}
+                      size={18}
                       className="hover:cursor-pointer text-gray-800"
                     />
                   </div>
-                ) : isFollowing ? (
-                  <div className="flex items-center gap-2">
-                    <button
-                      onClick={handleFollowOrUnfollow}
-                      disabled={loadingFollow}
-                      className="bg-gray-200 hover:bg-gray-300 text-red-500 py-2 px-4 rounded-md text-sm cursor-pointer disabled:opacity-50"
-                    >
-                      {loadingFollow ? "Unfollowing..." : "Unfollow"}
-                    </button>
-                    <button className="hover:bg-gray-300 h-8 rounded-md bg-gray-200 px-4 cursor-pointer text-sm">
-                      Message
-                    </button>
-                  </div>
                 ) : (
-                  <button
-                    onClick={handleFollowOrUnfollow}
-                    disabled={loadingFollow}
-                    className="bg-[#179cf5] hover:bg-blue-500 text-white font-bold py-2 px-6 rounded-md text-sm cursor-pointer disabled:opacity-50"
-                  >
-                    {loadingFollow ? "Following..." : "Follow"}
-                  </button>
+                  displayProfile &&
+                  (displayProfile as any).id &&
+                  !isLoggedInUserProfile && (
+                    <div className="flex items-center gap-2 mt-2">
+                      {isFollowing ? (
+                        <>
+                          <button
+                            onClick={handleFollowOrUnfollow}
+                            disabled={buttonLoading}
+                            className="px-4 py-2 rounded bg-gradient-to-r from-red-500 to-pink-500 text-white font-semibold shadow hover:from-red-600 hover:to-pink-600 transition"
+                          >
+                            {buttonLoading ? "..." : "Unfollow"}
+                          </button>
+                          <button className="px-4 py-2 rounded border border-blue-600 text-blue-600 font-semibold hover:bg-blue-50 transition">
+                            Message
+                          </button>
+                        </>
+                      ) : (
+                        <button
+                          onClick={handleFollowOrUnfollow}
+                          disabled={buttonLoading}
+                          className="px-4 py-2 rounded bg-gradient-to-r from-blue-600 to-purple-600 text-white font-semibold shadow hover:from-purple-600 hover:to-blue-600 transition"
+                        >
+                          {buttonLoading ? "..." : "Follow"}
+                        </button>
+                      )}
+                    </div>
+                  )
                 )}
               </div>
-              <div className="flex justify-center md:justify-start gap-4 sm:gap-6 text-center md:text-left text-sm sm:text-base">
-                <p>
-                  <span className="font-semibold">{userBlogs.length}</span>{" "}
-                  Blogs
-                </p>
-                <p>
-                  <span className="font-semibold">{userPosts.length}</span>{" "}
-                  Posts
-                </p>
-                <p className="cursor-pointer">
-                  <span className="font-semibold">{followers.length}</span>{" "}
-                  Followers
-                </p>
-                <p className="cursor-pointer">
-                  <span className="font-semibold">{following.length}</span>{" "}
-                  Following
-                </p>
+              {/* Follower Stats */}
+              <div className="flex flex-wrap justify-center md:justify-start gap-3 md:gap-6 text-center md:text-left text-xs md:text-base mt-2">
+                <div className="flex flex-col items-center md:items-start">
+                  <span className="font-bold text-lg md:text-2xl bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+                    {userBlogs.length}
+                  </span>
+                  <span className="text-gray-500 text-xs md:text-sm">
+                    Blogs
+                  </span>
+                </div>
+                <div className="flex flex-col items-center md:items-start">
+                  <span className="font-bold text-lg md:text-2xl bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+                    {userPosts.length}
+                  </span>
+                  <span className="text-gray-500 text-xs md:text-sm">
+                    Posts
+                  </span>
+                </div>
+                <div
+                  className="flex flex-col items-center md:items-start cursor-pointer"
+                  onClick={handleOpenFollowers}
+                >
+                  <span className="font-bold text-lg md:text-2xl bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+                    {safeFollowers.length}
+                  </span>
+                  <span className="text-gray-500 text-xs md:text-sm">
+                    Followers
+                  </span>
+                </div>
+                <div
+                  className="flex flex-col items-center md:items-start cursor-pointer"
+                  onClick={handleOpenFollowing}
+                >
+                  <span className="font-bold text-lg md:text-2xl bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+                    {safeFollowing.length}
+                  </span>
+                  <span className="text-gray-500 text-xs md:text-sm">
+                    Following
+                  </span>
+                </div>
               </div>
-              <div>
-                <span className="text-sm sm:text-base">
-                  {userProfile.bio || "No bio available"}
+              {/* Bio and Buy Premium Button (left-aligned on desktop) */}
+              <div className="mt-4 flex flex-col items-center md:items-start gap-3 w-full md:max-w-xs">
+                <span className="text-xs md:text-base text-gray-700 w-full text-center md:text-left">
+                  {(displayProfile as any)?.bio || "No bio available"}
                 </span>
+                {/* Show Buy Premium button only if not viewing own profile */}
+                {!isLoggedInUserProfile && (
+                  <motion.button
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
+                    className="w-full py-2 mt-2 rounded-lg bg-gradient-to-r from-blue-600 to-purple-600 text-white font-bold shadow-lg hover:from-purple-700 hover:to-blue-700 transition"
+                  >
+                    Buy Premium
+                  </motion.button>
+                )}
               </div>
             </div>
           </section>
         </div>
 
-        {/* TABS SECTION */}
-        <div className="border-t border-t-gray-300 pt-4">
-          <div className="flex items-center justify-center gap-4 sm:gap-8 lg:gap-12 text-xs sm:text-sm overflow-x-auto">
+        {/* Tabs Section */}
+        <div className="border-t border-t-gray-300 pt-2 md:pt-4 mt-2 md:mt-4">
+          <div className="flex items-center justify-center gap-4 md:gap-12 text-xs md:text-sm overflow-x-auto">
             {["recent-content", "posts", "blogs", "tags", "saved"].map(
               (tab) => (
                 <span
                   key={tab}
-                  className={`py-3 cursor-pointer whitespace-nowrap ${
+                  className={`py-2 md:py-3 cursor-pointer whitespace-nowrap ${
                     activeTab === tab
                       ? "font-bold border-b-2 border-gray-400"
                       : "text-gray-500"
@@ -270,23 +355,33 @@ export default function UserProfile() {
             )}
           </div>
 
-          {/* Render tab content */}
+          {/* Display Posts for "Recent Content" as full posts */}
           {activeTab === "recent-content" ? (
-            <div className="flex flex-col mx-auto gap-4 max-w-lg">
-              {userPosts.length || userBlogs.length ? (
-                [...userPosts, ...userBlogs]
+            <div className="flex flex-col mx-auto gap-2 md:gap-4 max-w-xs md:max-w-lg mt-2 md:mt-4">
+              {userBlogs.length > 0 || userPosts.length > 0 ? (
+                [
+                  ...userBlogs.map((blog: any) => ({ ...blog, type: "blog" })),
+                  ...userPosts.map((post: any) => ({ ...post, type: "post" })),
+                ]
                   .sort(
                     (a, b) =>
                       new Date(b.createdAt).getTime() -
                       new Date(a.createdAt).getTime()
                   )
-                  .map((item) =>
-                    "title" in item ? (
-                      <BlogCard key={item.id || item._id} blog={item} />
-                    ) : (
-                      <PostCard key={item.id || item._id} post={item} />
-                    )
-                  )
+                  .map((item) => {
+                    if (item.type === "blog") {
+                      return (
+                        <div
+                          key={item.id}
+                          onClick={() => setSelectedBlog(item)}
+                        >
+                          <BlogCard blog={item as Blog} />
+                        </div>
+                      );
+                    } else {
+                      return <PostCard key={item.id} post={item as Post} />;
+                    }
+                  })
               ) : (
                 <p className="text-center text-gray-500">
                   No recent content available.
@@ -294,28 +389,28 @@ export default function UserProfile() {
               )}
             </div>
           ) : activeTab === "blogs" ? (
-            <div className="flex flex-col gap-4 max-w-xl mx-auto">
-              {displayedBlogs.length > 0 ? (
-                displayedBlogs.map((blog) => (
-                  <BlogCard key={blog.id || blog._id} blog={blog} />
+            <div className="flex flex-col gap-2 md:gap-4 max-w-xs md:max-w-xl mx-auto mt-2 md:mt-4">
+              {userBlogs && userBlogs.length > 0 ? (
+                userBlogs.map((blog: any) => (
+                  <BlogCard key={blog.id} blog={blog} />
                 ))
               ) : (
                 <p className="text-center text-gray-500">No blogs available.</p>
               )}
             </div>
           ) : activeTab === "posts" ? (
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mt-4">
-              {displayedPosts.length > 0 ? (
-                displayedPosts.map((post) => (
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-2 md:gap-4 mt-2 md:mt-4">
+              {userPosts && userPosts.length > 0 ? (
+                userPosts.map((post: any) => (
                   <div
                     onClick={() => handleOpenDialog(post)}
-                    key={post.id || post._id}
+                    key={post.id}
                     className="relative group cursor-pointer"
                   >
                     <img
                       src={post.image || "/images/placeholder-post.jpg"}
                       alt="postimage"
-                      className="rounded-md w-full aspect-square object-cover"
+                      className="rounded-md w-full aspect-square object-cover max-h-32 md:max-h-48"
                     />
                     <div className="absolute inset-0 flex items-center justify-center bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
                       <div className="flex items-center text-white space-x-4">
@@ -338,11 +433,11 @@ export default function UserProfile() {
               )}
             </div>
           ) : activeTab === "tags" ? (
-            <div className="text-center text-gray-500">
+            <div className="text-center text-gray-500 mt-4">
               <p>Tags feature coming soon...</p>
             </div>
           ) : activeTab === "saved" ? (
-            <div className="text-center text-gray-500">
+            <div className="text-center text-gray-500 mt-4">
               <p>Saved items feature coming soon...</p>
             </div>
           ) : null}
@@ -364,9 +459,182 @@ export default function UserProfile() {
           blog={selectedBlog}
         />
       )}
+      {/* Right Sidebar - Fixed at Extreme Right */}
       <div className="hidden lg:block w-72 ml-auto">
         <RightSidebar />
       </div>
+      {/* Followers Modal */}
+      <AnimatePresence>
+        {showFollowersModal && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center bg-transparent bg-opacity-40 backdrop-blur-sm"
+            onClick={() => setShowFollowersModal(false)}
+          >
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              transition={{ duration: 0.2 }}
+              className="bg-white rounded-xl shadow-xl max-w-md w-full mx-4 p-6 relative"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <h2 className="text-xl font-bold mb-4 text-center">Followers</h2>
+              {followersLoading ? (
+                <div className="flex justify-center py-8">
+                  <LoadingSpinner />
+                </div>
+              ) : safeFollowers.length === 0 ? (
+                <div className="text-center text-gray-500 py-8">
+                  No followers yet.
+                </div>
+              ) : (
+                <div className="max-h-80 overflow-y-auto divide-y">
+                  {safeFollowers.map((f) => (
+                    <div
+                      key={f.id}
+                      className="flex items-center justify-between py-3"
+                    >
+                      <div className="flex items-center space-x-3">
+                        <div
+                          className="cursor-pointer"
+                          onClick={() => handleNavigateToProfile(f.id)}
+                        >
+                          <Avatar
+                            image={
+                              f.profilePicture || "/images/default-avatar.png"
+                            }
+                            altText={f.username}
+                            size="sm"
+                          />
+                        </div>
+                        <div
+                          className="flex-1 cursor-pointer"
+                          onClick={() => handleNavigateToProfile(f.id)}
+                        >
+                          <div className="font-semibold text-gray-900 hover:text-blue-600 transition">
+                            {f.username}
+                          </div>
+                          {f.bio && (
+                            <div className="text-sm text-gray-600 mt-1">
+                              {f.bio}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                      {/* Show Remove button only for logged-in user's own profile */}
+                      {isLoggedInUserProfile && (
+                        <button
+                          onClick={() => {
+                            dispatch(removeFollower(f.id));
+                          }}
+                          className="px-3 py-1 text-xs bg-red-500 text-white rounded hover:bg-red-600 transition"
+                        >
+                          Remove
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+              <button
+                className="absolute top-2 right-2 text-gray-400 hover:text-gray-600 text-xl"
+                onClick={() => setShowFollowersModal(false)}
+              >
+                &times;
+              </button>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+      {/* Following Modal */}
+      <AnimatePresence>
+        {showFollowingModal && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center bg-transparent bg-opacity-40 backdrop-blur-sm"
+            onClick={() => setShowFollowingModal(false)}
+          >
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              transition={{ duration: 0.2 }}
+              className="bg-white rounded-xl shadow-xl max-w-md w-full mx-4 p-6 relative"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <h2 className="text-xl font-bold mb-4 text-center">Following</h2>
+              {followingLoading ? (
+                <div className="flex justify-center py-8">
+                  <LoadingSpinner />
+                </div>
+              ) : safeFollowing.length === 0 ? (
+                <div className="text-center text-gray-500 py-8">
+                  Not following anyone yet.
+                </div>
+              ) : (
+                <div className="max-h-80 overflow-y-auto divide-y">
+                  {safeFollowing.map((f) => (
+                    <div
+                      key={f.id}
+                      className="flex items-center justify-between py-3"
+                    >
+                      <div className="flex items-center space-x-3">
+                        <div
+                          className="cursor-pointer"
+                          onClick={() => handleNavigateToProfile(f.id)}
+                        >
+                          <Avatar
+                            image={
+                              f.profilePicture || "/images/default-avatar.png"
+                            }
+                            altText={f.username}
+                            size="sm"
+                          />
+                        </div>
+                        <div
+                          className="flex-1 cursor-pointer"
+                          onClick={() => handleNavigateToProfile(f.id)}
+                        >
+                          <div className="font-semibold text-gray-900 hover:text-blue-600 transition">
+                            {f.username}
+                          </div>
+                          {f.bio && (
+                            <div className="text-sm text-gray-600 mt-1">
+                              {f.bio}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                      {/* Show Unfollow button only for logged-in user's own profile */}
+                      {isLoggedInUserProfile && (
+                        <button
+                          onClick={() => {
+                            dispatch(unfollowUser(f.id));
+                          }}
+                          className="px-3 py-1 text-xs bg-gray-500 text-white rounded hover:bg-gray-600 transition"
+                        >
+                          Unfollow
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+              <button
+                className="absolute top-2 right-2 text-gray-400 hover:text-gray-600 text-xl"
+                onClick={() => setShowFollowingModal(false)}
+              >
+                &times;
+              </button>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

@@ -164,7 +164,7 @@ export interface Message {
   senderId: string;
   receiverId: string;
   createdAt: string;
-  read: boolean;
+  status: 'sent' | 'delivered' | 'read';
 }
 
 // Conversation Types

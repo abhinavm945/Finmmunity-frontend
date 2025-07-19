@@ -1,7 +1,7 @@
 import { ReactNode } from "react";
 import "./globals.css";
 import Header from "../components/shared/Header";
-import ClientLayout from "../components/ClientLayout";
+import ClientLayout from "../components/shared/ClientLayout";
 import Providers from "../components/shared/Providers";
 
 export const metadata = {

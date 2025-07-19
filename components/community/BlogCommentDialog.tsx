@@ -36,7 +36,11 @@ const BlogCommentDialog = ({ open, setOpen, blog }: BlogCommentDialogProps) => {
   const author = blog?.author;
 
   // Like state
-  const [liked, setLiked] = useState(blog?.likes?.includes(user?._id) || false);
+  const [liked, setLiked] = useState(
+    blog?.likes?.some((like) =>
+      typeof like === "string" ? like === user?.id : like.userId === user?.id
+    ) || false
+  );
 
   // Bookmark state
   const [isBookmark, setIsBookmark] = useState(
@@ -66,8 +70,16 @@ const BlogCommentDialog = ({ open, setOpen, blog }: BlogCommentDialogProps) => {
   useEffect(() => {
     if (blog) {
       setComments(blog?.comments);
+      // Update like state when blog changes
+      setLiked(
+        blog?.likes?.some((like) =>
+          typeof like === "string"
+            ? like === user?.id
+            : like.userId === user?.id
+        ) || false
+      );
     }
-  }, [blog]);
+  }, [blog, user?.id]);
 
   if (!open) return null;
 
@@ -82,61 +94,52 @@ const BlogCommentDialog = ({ open, setOpen, blog }: BlogCommentDialogProps) => {
   const LikeOrDisLikeHandler = async () => {
     if (!user) return toast.error("You need to be logged in to like blogs.");
     try {
-      const action = liked ? "dislike" : "like";
+      const token =
+        typeof window !== "undefined" ? localStorage.getItem("token") : null;
       const res = await axios.post(
-        `http://localhost:8000/api/v1/blog/${blog._id}/${action}`,
+        `${config.api.baseUrl}/community/blogs/${blog.id}/like`,
         {},
-        { withCredentials: true }
+        {
+          headers: {
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          },
+          withCredentials: true,
+        }
       );
       if (res.data.success) {
         setLiked(!liked);
-        // If you need to update blogs or profile, use dispatch with the appropriate thunk or action
-        // For now, we'll just update the local state
-        const updatedBlogs = blogs.map((b) =>
-          b._id === blog._id
-            ? {
-                ...b,
-                likes: liked
-                  ? b.likes.filter((id) => id !== user._id)
-                  : [...b.likes, user._id],
-              }
-            : b
-        );
-        // dispatch(setBlogs(updatedBlogs)); // This line was removed as per the edit hint
-        if (userProfile && userProfile._id === blog.author?._id) {
-          const updatedUserBlogs = {
-            ...userProfile,
-            blogs: userProfile.blogs.map((p) =>
-              p._id === blog._id
-                ? {
-                    ...p,
-                    likes: liked
-                      ? p.likes.filter((id) => id !== user._id)
-                      : [...p.likes, user._id],
-                  }
-                : p
-            ),
-          };
-          // dispatch(setProfile(updatedUserBlogs)); // This line was removed as per the edit hint
-        }
+        // Update local state - Redux will be updated on next fetch
+        toast.success(liked ? "Blog unliked" : "Blog liked");
       }
     } catch (error) {
-      toast.error("Failed to update like status. Try again.", error);
+      toast.error("Failed to update like status. Try again.");
+      console.error("Error toggling like:", error);
     }
   };
 
   const bookmarkHandler = async () => {
     try {
-      const res = await axios.get(
-        `http://localhost:8000/api/v1/blog/${blog?._id}/bookmark`,
-        { withCredentials: true }
+      const token =
+        typeof window !== "undefined" ? localStorage.getItem("token") : null;
+      const res = await axios.post(
+        `${config.api.baseUrl}/community/blogs/${blog?.id}/bookmark`,
+        {},
+        {
+          headers: {
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          },
+          withCredentials: true,
+        }
       );
       if (res.data.success) {
-        toast.success(res.data.message);
-        setIsBookmark(res.data.type !== "unsaved");
+        setIsBookmark(!isBookmark);
+        toast.success(
+          isBookmark ? "Blog removed from bookmarks" : "Blog added to bookmarks"
+        );
       }
     } catch (error) {
-      console.log(error);
+      toast.error("Failed to update bookmark status. Try again.");
+      console.error("Error toggling bookmark:", error);
     }
   };
 
@@ -259,7 +262,15 @@ const BlogCommentDialog = ({ open, setOpen, blog }: BlogCommentDialogProps) => {
               )}
 
               <MessageCircle className="cursor-pointer hover:text-gray-600" />
-              <Send className="cursor-pointer hover:text-gray-600" />
+              <Send
+                className="cursor-pointer hover:text-gray-600"
+                onClick={() => {
+                  navigator.clipboard.writeText(
+                    `${window.location.origin}/community/blog/${blog.id}`
+                  );
+                  toast.success("Blog link copied to clipboard!");
+                }}
+              />
             </div>
             {isBookmark ? (
               <BookmarkCheck

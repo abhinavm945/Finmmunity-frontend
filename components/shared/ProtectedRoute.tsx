@@ -2,7 +2,6 @@
 
 import { ReactNode, useEffect, useState } from "react";
 import { useAuth } from "../../hooks/useAuth";
-import LoadingSpinner from "./LoadingSpinner";
 import { motion } from "framer-motion";
 import Link from "next/link";
 
@@ -19,11 +18,6 @@ export default function ProtectedRoute({ children }: ProtectedRouteProps) {
 
   if (!isClient) return null;
   if (isLoading) {
-    return (
-      <div className="flex justify-center items-center min-h-screen">
-        <LoadingSpinner />
-      </div>
-    );
   }
   if (!user) {
     return (

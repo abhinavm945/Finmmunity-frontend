@@ -162,9 +162,19 @@ function getFallbackData(endpoint: string): any {
 
 // Helper function to normalize API response
 function normalizeResponse(data: any): ApiResponse<any> {
-  // If response already has success property, return as is
   if (data && typeof data.success === 'boolean') {
-    return data;
+    // If the response has no 'data' property, put everything except 'success', 'message', and 'error' into 'data'
+    if (data.data !== undefined) {
+      return data;
+    } else {
+      const { success, message, error, ...rest } = data;
+      return {
+        success,
+        message,
+        error,
+        data: Object.keys(rest).length > 0 ? rest : undefined,
+      };
+    }
   }
   
   // If response has error property, convert to standard format
@@ -462,11 +472,11 @@ class ApiClient {
   }
 
   // File upload request
-  async upload<T>(endpoint: string, formData: FormData): Promise<ApiResponse<T>> {
+  async upload<T>(endpoint: string, formData: FormData, method: 'POST' | 'PUT' = 'POST'): Promise<ApiResponse<T>> {
     const url = `${this.baseURL}${endpoint}`;
     
     const config: RequestInit = {
-      method: 'POST',
+      method,
       headers: {
         'Authorization': this.token ? `Bearer ${this.token}` : '',
       },
@@ -526,7 +536,7 @@ export const authAPI = {
 
   // Update profile
   updateProfile: async (formData: FormData) => {
-    return apiClient.upload('/auth/profile', formData);
+    return apiClient.upload('/auth/profile', formData, 'PUT');
   },
 
   // Refresh token
@@ -784,22 +794,37 @@ export const communityAPI = {
   messages: {
     // Get conversations
     getConversations: async () => {
-      return apiClient.get('/community/messages/conversations');
+      return apiClient.get('/messages/conversations');
     },
 
-    // Get messages for conversation
-    getMessages: async (params: { conversationId: string; page?: number; limit?: number }) => {
-      return apiClient.get('/community/messages', params);
+    // Get messages for a conversation
+    getConversationMessages: async (conversationId: string, page = 1, limit = 50) => {
+      return apiClient.get(`/messages/conversations/${conversationId}/messages`, { page, limit });
     },
 
-    // Send message
-    sendMessage: async (data: { content: string; receiverId: string }) => {
-      return apiClient.post('/community/messages', data);
+    // Get the last message in a conversation
+    getLastMessage: async (conversationId: string) => {
+      return apiClient.get(`/messages/conversations/${conversationId}/last-message`);
     },
 
-    // Mark message as read
-    markAsRead: async (params: { conversationId: string }) => {
-      return apiClient.put('/community/messages/read', params);
+    // Send message in a conversation
+    sendMessage: async (conversationId: string, content: string) => {
+      return apiClient.post(`/messages/conversations/${conversationId}/messages`, { content });
+    },
+
+    // Start a new conversation
+    startConversation: async (receiverId: string, content: string) => {
+      return apiClient.post('/messages/conversations', { receiverId, content });
+    },
+
+    // Get unread message count
+    getUnreadCount: async () => {
+      return apiClient.get('/messages/unread-count');
+    },
+
+    // Mark a message as read
+    markMessageRead: async (messageId: string) => {
+      return apiClient.put(`/messages/${messageId}/read`);
     },
   },
 
@@ -853,12 +878,27 @@ export const userAPI = {
   getBookmarks: async (userId: string) => {
     return apiClient.get(`/users/${userId}/bookmarks`);
   },
+
+  // Search users by username or email
+  searchUsers: async (query: string) => {
+    return apiClient.get(`/users/search`, { query });
+  },
 };
 
 // Health check
 export const healthAPI = {
   check: async () => {
     return apiClient.get('/health');
+  },
+};
+
+// Chat API
+export const chatAPI = {
+  markMessageDelivered: async (id: string) => {
+    return apiClient.put(`/messages/${id}/delivered`);
+  },
+  markMessageRead: async (id: string) => {
+    return apiClient.put(`/messages/${id}/read`);
   },
 };
 

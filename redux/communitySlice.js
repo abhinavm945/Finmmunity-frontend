@@ -3,6 +3,17 @@ import axios from "axios";
 
 const API_BASE_URL = "http://localhost:5000/api";
 
+// Helper to get Authorization header from localStorage
+function getAuthHeaders() {
+  if (typeof window !== "undefined") {
+    const token = localStorage.getItem("token");
+    if (token) {
+      return { Authorization: `Bearer ${token}` };
+    }
+  }
+  return {};
+}
+
 // --- Async Thunks ---
 
 // Blogs
@@ -12,6 +23,7 @@ export const fetchBlogs = createAsyncThunk(
     const res = await axios.get(`${API_BASE_URL}/community/blogs`, {
       params,
       withCredentials: true,
+      headers: getAuthHeaders(),
     });
     return res.data.blogs;
   }
@@ -21,6 +33,7 @@ export const fetchBlogById = createAsyncThunk(
   async (id, thunkAPI) => {
     const res = await axios.get(`${API_BASE_URL}/community/blogs/${id}`, {
       withCredentials: true,
+      headers: getAuthHeaders(),
     });
     return res.data.blog;
   }
@@ -30,6 +43,7 @@ export const createBlog = createAsyncThunk(
   async (formData, thunkAPI) => {
     const res = await axios.post(`${API_BASE_URL}/community/blogs`, formData, {
       withCredentials: true,
+      headers: getAuthHeaders(),
     });
     return res.data.blog;
   }
@@ -42,6 +56,7 @@ export const updateBlog = createAsyncThunk(
       formData,
       {
         withCredentials: true,
+        headers: getAuthHeaders(),
       }
     );
     return res.data.blog;
@@ -52,6 +67,7 @@ export const deleteBlog = createAsyncThunk(
   async (id, thunkAPI) => {
     await axios.delete(`${API_BASE_URL}/community/blogs/${id}`, {
       withCredentials: true,
+      headers: getAuthHeaders(),
     });
     return id;
   }
@@ -62,7 +78,7 @@ export const likeBlog = createAsyncThunk(
     const res = await axios.post(
       `${API_BASE_URL}/community/blogs/${id}/like`,
       {},
-      { withCredentials: true }
+      { withCredentials: true, headers: getAuthHeaders() }
     );
     return { id, liked: res.data.liked };
   }
@@ -73,7 +89,7 @@ export const bookmarkBlog = createAsyncThunk(
     const res = await axios.post(
       `${API_BASE_URL}/community/blogs/${id}/bookmark`,
       {},
-      { withCredentials: true }
+      { withCredentials: true, headers: getAuthHeaders() }
     );
     return { id, bookmarked: res.data.bookmarked };
   }
@@ -86,6 +102,7 @@ export const fetchPosts = createAsyncThunk(
     const res = await axios.get(`${API_BASE_URL}/community/posts`, {
       params,
       withCredentials: true,
+      headers: getAuthHeaders(),
     });
     return res.data.posts;
   }
@@ -95,6 +112,7 @@ export const fetchPostById = createAsyncThunk(
   async (id, thunkAPI) => {
     const res = await axios.get(`${API_BASE_URL}/community/posts/${id}`, {
       withCredentials: true,
+      headers: getAuthHeaders(),
     });
     return res.data.post;
   }
@@ -104,6 +122,7 @@ export const createPost = createAsyncThunk(
   async (formData, thunkAPI) => {
     const res = await axios.post(`${API_BASE_URL}/community/posts`, formData, {
       withCredentials: true,
+      headers: getAuthHeaders(),
     });
     return res.data.post;
   }
@@ -116,6 +135,7 @@ export const updatePost = createAsyncThunk(
       formData,
       {
         withCredentials: true,
+        headers: getAuthHeaders(),
       }
     );
     return res.data.post;
@@ -126,6 +146,7 @@ export const deletePost = createAsyncThunk(
   async (id, thunkAPI) => {
     await axios.delete(`${API_BASE_URL}/community/posts/${id}`, {
       withCredentials: true,
+      headers: getAuthHeaders(),
     });
     return id;
   }
@@ -136,7 +157,7 @@ export const likePost = createAsyncThunk(
     const res = await axios.post(
       `${API_BASE_URL}/community/posts/${id}/like`,
       {},
-      { withCredentials: true }
+      { withCredentials: true, headers: getAuthHeaders() }
     );
     return { id, liked: res.data.liked };
   }
@@ -147,7 +168,7 @@ export const bookmarkPost = createAsyncThunk(
     const res = await axios.post(
       `${API_BASE_URL}/community/posts/${id}/bookmark`,
       {},
-      { withCredentials: true }
+      { withCredentials: true, headers: getAuthHeaders() }
     );
     return { id, bookmarked: res.data.bookmarked };
   }
@@ -160,6 +181,7 @@ export const addComment = createAsyncThunk(
     // data: { postId, blogId, content }
     const res = await axios.post(`${API_BASE_URL}/community/comments`, data, {
       withCredentials: true,
+      headers: getAuthHeaders(),
     });
     return res.data.comment;
   }
@@ -170,7 +192,7 @@ export const updateComment = createAsyncThunk(
     const res = await axios.put(
       `${API_BASE_URL}/community/comments/${id}`,
       { content },
-      { withCredentials: true }
+      { withCredentials: true, headers: getAuthHeaders() }
     );
     return res.data.comment;
   }
@@ -180,6 +202,7 @@ export const deleteComment = createAsyncThunk(
   async (id, thunkAPI) => {
     await axios.delete(`${API_BASE_URL}/community/comments/${id}`, {
       withCredentials: true,
+      headers: getAuthHeaders(),
     });
     return id;
   }
@@ -190,7 +213,7 @@ export const likeComment = createAsyncThunk(
     const res = await axios.post(
       `${API_BASE_URL}/community/comments/${id}/like`,
       {},
-      { withCredentials: true }
+      { withCredentials: true, headers: getAuthHeaders() }
     );
     return { id, liked: res.data.liked };
   }
@@ -203,9 +226,30 @@ export const followUser = createAsyncThunk(
     const res = await axios.post(
       `${API_BASE_URL}/community/users/${id}/follow`,
       {},
-      { withCredentials: true }
+      { withCredentials: true, headers: getAuthHeaders() }
     );
-    return { id, following: res.data.following };
+    return {
+      id,
+      following: res.data.following,
+      followerCount: res.data.followerCount,
+    };
+  }
+);
+
+// Unfollow user (same endpoint as follow, just different action)
+export const unfollowUser = createAsyncThunk(
+  "community/unfollowUser",
+  async (id, thunkAPI) => {
+    const res = await axios.post(
+      `${API_BASE_URL}/community/users/${id}/follow`,
+      {},
+      { withCredentials: true, headers: getAuthHeaders() }
+    );
+    return {
+      id,
+      following: res.data.following,
+      followerCount: res.data.followerCount,
+    };
   }
 );
 export const fetchSuggestedUsers = createAsyncThunk(
@@ -214,6 +258,7 @@ export const fetchSuggestedUsers = createAsyncThunk(
     const res = await axios.get(`${API_BASE_URL}/community/users/suggested`, {
       params,
       withCredentials: true,
+      headers: getAuthHeaders(),
     });
     return res.data.users;
   }
@@ -224,6 +269,7 @@ export const fetchBookmarks = createAsyncThunk(
     const res = await axios.get(`${API_BASE_URL}/community/users/bookmarks`, {
       params,
       withCredentials: true,
+      headers: getAuthHeaders(),
     });
     return res.data.bookmarks;
   }
@@ -236,8 +282,9 @@ export const fetchTrending = createAsyncThunk(
     const res = await axios.get(`${API_BASE_URL}/community/trending`, {
       params,
       withCredentials: true,
+      headers: getAuthHeaders(),
     });
-    return res.data.trending;
+    return res.data.data; // Fix: use .data, not .trending
   }
 );
 export const fetchDiscovery = createAsyncThunk(
@@ -246,8 +293,47 @@ export const fetchDiscovery = createAsyncThunk(
     const res = await axios.get(`${API_BASE_URL}/community/discover`, {
       params,
       withCredentials: true,
+      headers: getAuthHeaders(),
     });
     return res.data.discovery;
+  }
+);
+
+// Search all users
+export const searchUsers = createAsyncThunk(
+  "community/searchUsers",
+  async (query, thunkAPI) => {
+    console.log("Searching for users with query:", query);
+    const res = await axios.get(`${API_BASE_URL}/users/search`, {
+      params: { query },
+      withCredentials: true,
+      headers: getAuthHeaders(),
+    });
+    console.log("Search response:", res.data);
+    return res.data.data.users;
+  }
+);
+
+// User-specific content
+export const fetchUserBlogs = createAsyncThunk(
+  "community/fetchUserBlogs",
+  async (userId, thunkAPI) => {
+    const res = await axios.get(`${API_BASE_URL}/users/${userId}/blogs`, {
+      withCredentials: true,
+      headers: getAuthHeaders(),
+    });
+    return res.data.data; // Backend returns { data: blogs[] }
+  }
+);
+
+export const fetchUserPosts = createAsyncThunk(
+  "community/fetchUserPosts",
+  async (userId, thunkAPI) => {
+    const res = await axios.get(`${API_BASE_URL}/users/${userId}/posts`, {
+      withCredentials: true,
+      headers: getAuthHeaders(),
+    });
+    return res.data.data; // Backend returns { data: posts[] }
   }
 );
 
@@ -258,12 +344,17 @@ const communitySlice = createSlice({
   initialState: {
     blogs: [],
     posts: [],
+    userBlogs: [], // Separate state for user-specific blogs
+    userPosts: [], // Separate state for user-specific posts
     comments: [],
     bookmarks: [],
     suggestedUsers: [],
+    searchResults: [],
     trending: [],
     discovery: [],
     loading: false,
+    searchLoading: false,
+    suggestedUsersLoading: false,
     error: null,
   },
   reducers: {
@@ -272,6 +363,9 @@ const communitySlice = createSlice({
     },
     clearCommunityLoading(state) {
       state.loading = false;
+    },
+    clearSearchResults(state) {
+      state.searchResults = [];
     },
   },
   extraReducers: (builder) => {
@@ -306,9 +400,19 @@ const communitySlice = createSlice({
         const blog = state.blogs.find((b) => b.id === action.payload.id);
         if (blog) {
           if (action.payload.liked) {
-            blog.likes.push("currentUser"); // Replace with actual user id
+            // Add current user to likes
+            const currentUser = {
+              userId: "currentUser",
+              id: Date.now().toString(),
+            };
+            blog.likes.push(currentUser);
           } else {
-            blog.likes = blog.likes.filter((id) => id !== "currentUser");
+            // Remove current user from likes
+            blog.likes = blog.likes.filter((like) =>
+              typeof like === "string"
+                ? like !== "currentUser"
+                : like.userId !== "currentUser"
+            );
           }
         }
       })
@@ -349,9 +453,19 @@ const communitySlice = createSlice({
         const post = state.posts.find((p) => p.id === action.payload.id);
         if (post) {
           if (action.payload.liked) {
-            post.likes.push("currentUser"); // Replace with actual user id
+            // Add current user to likes
+            const currentUser = {
+              userId: "currentUser",
+              id: Date.now().toString(),
+            };
+            post.likes.push(currentUser);
           } else {
-            post.likes = post.likes.filter((id) => id !== "currentUser");
+            // Remove current user from likes
+            post.likes = post.likes.filter((like) =>
+              typeof like === "string"
+                ? like !== "currentUser"
+                : like.userId !== "currentUser"
+            );
           }
         }
       })
@@ -392,10 +506,56 @@ const communitySlice = createSlice({
         );
         if (user) {
           user.isFollowing = action.payload.following;
+          user._count.followers = action.payload.followerCount; // Use accurate count from backend
+        }
+        // Also update in search results
+        const searchUser = state.searchResults.find(
+          (u) => u.id === action.payload.id
+        );
+        if (searchUser) {
+          searchUser.isFollowing = action.payload.following;
+          searchUser._count.followers = action.payload.followerCount; // Use accurate count from backend
         }
       })
+      .addCase(unfollowUser.fulfilled, (state, action) => {
+        const user = state.suggestedUsers.find(
+          (u) => u.id === action.payload.id
+        );
+        if (user) {
+          user.isFollowing = action.payload.following;
+          user._count.followers = action.payload.followerCount; // Use accurate count from backend
+        }
+        // Also update in search results
+        const searchUser = state.searchResults.find(
+          (u) => u.id === action.payload.id
+        );
+        if (searchUser) {
+          searchUser.isFollowing = action.payload.following;
+          searchUser._count.followers = action.payload.followerCount; // Use accurate count from backend
+        }
+      })
+      .addCase(fetchSuggestedUsers.pending, (state) => {
+        state.suggestedUsersLoading = true;
+        state.error = null;
+      })
       .addCase(fetchSuggestedUsers.fulfilled, (state, action) => {
+        state.suggestedUsersLoading = false;
         state.suggestedUsers = action.payload;
+      })
+      .addCase(fetchSuggestedUsers.rejected, (state, action) => {
+        state.suggestedUsersLoading = false;
+        state.error = action.error.message;
+      })
+      .addCase(searchUsers.pending, (state) => {
+        state.searchLoading = true;
+      })
+      .addCase(searchUsers.fulfilled, (state, action) => {
+        state.searchLoading = false;
+        state.searchResults = action.payload;
+      })
+      .addCase(searchUsers.rejected, (state, action) => {
+        state.searchLoading = false;
+        state.error = action.error.message;
       })
       .addCase(fetchBookmarks.fulfilled, (state, action) => {
         state.bookmarks = action.payload;
@@ -408,9 +568,20 @@ const communitySlice = createSlice({
       .addCase(fetchDiscovery.fulfilled, (state, action) => {
         state.discovery = action.payload;
       });
+    // User-specific content
+    builder
+      .addCase(fetchUserBlogs.fulfilled, (state, action) => {
+        state.userBlogs = action.payload || []; // Ensure it's always an array
+      })
+      .addCase(fetchUserPosts.fulfilled, (state, action) => {
+        state.userPosts = action.payload || []; // Ensure it's always an array
+      });
   },
 });
 
 export default communitySlice.reducer;
-export const { clearCommunityError, clearCommunityLoading } =
-  communitySlice.actions;
+export const {
+  clearCommunityError,
+  clearCommunityLoading,
+  clearSearchResults,
+} = communitySlice.actions;

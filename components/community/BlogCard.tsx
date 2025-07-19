@@ -8,7 +8,7 @@ import Avatar from "../shared/Avatar";
 import { motion } from "framer-motion";
 import BlogCommentDialog from "./BlogCommentDialog";
 import { Blog } from "../../utils/types";
-import { useCommunity } from "../../hooks/useApi";
+
 import { formatDate } from "../../utils/formatDate";
 import Image from "next/image";
 import { User } from "../../utils/types";
@@ -21,10 +21,10 @@ interface BlogCardProps {
 
 export default function BlogCard({ blog }: BlogCardProps) {
   console.log("BlogCard received blog:", blog);
+
   const user = useSelector(
     (state: { user: { user: User } }) => state.user?.user
   );
-  const { blogs, bookmarks } = useCommunity();
 
   const [isBookmarked, setIsBookmarked] = useState(blog.isBookmarked || false);
   const [showComments, setShowComments] = useState(false);
@@ -67,17 +67,10 @@ export default function BlogCard({ blog }: BlogCardProps) {
         }
       );
       if (res.data.success) {
-        if (res.data.liked) {
-          setLikes((prev) => [...prev, { userId: user.id }]);
-        } else {
-          setLikes((prev) =>
-            prev.filter((like) =>
-              typeof like === "string"
-                ? like !== user.id
-                : like.userId !== user.id
-            )
-          );
+        if (res.data.likes) {
+          setLikes(res.data.likes);
         }
+        // Update local state - Redux will be updated on next fetch
       }
     } catch (error) {
       console.error("Error toggling like:", error);
@@ -88,12 +81,23 @@ export default function BlogCard({ blog }: BlogCardProps) {
     if (!user) return;
 
     try {
-      if (isBookmarked) {
-        await bookmarks.remove.execute({ id: blog.id });
-      } else {
-        await bookmarks.add.execute({ type: "BLOG", blogId: blog.id });
+      const token =
+        typeof window !== "undefined" ? localStorage.getItem("token") : null;
+      const res = await axios.post(
+        `${config.api.baseUrl}/community/blogs/${blog.id}/bookmark`,
+        {},
+        {
+          headers: {
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          },
+          withCredentials: true,
+        }
+      );
+      if (res.data.success) {
+        setIsBookmarked(!isBookmarked);
+        // You can add toast notification here if you have toast set up
+        console.log(isBookmarked ? "Blog removed from bookmarks" : "Blog added to bookmarks");
       }
-      setIsBookmarked(!isBookmarked);
     } catch (error) {
       console.error("Error toggling bookmark:", error);
     }

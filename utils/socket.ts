@@ -221,6 +221,13 @@ class SocketService {
     }
   }
 
+  // Listen for message status updates
+  onMessageStatusUpdate(callback: (data: { messageId: string; status: string }) => void) {
+    if (this.socket) {
+      this.socket.on('messageStatusUpdate', callback);
+    }
+  }
+
   // Remove event listeners
   off(event: string) {
     if (this.socket) {
@@ -281,6 +288,7 @@ export const useSocket = () => {
     onPostUpdate: socketService.onPostUpdate.bind(socketService),
     onBlogUpdate: socketService.onBlogUpdate.bind(socketService),
     onQuestionUpdate: socketService.onQuestionUpdate.bind(socketService),
+    onMessageStatusUpdate: socketService.onMessageStatusUpdate.bind(socketService),
     off: socketService.off.bind(socketService),
     offAll: socketService.offAll.bind(socketService),
     getConnectionStatus: socketService.getConnectionStatus.bind(socketService),

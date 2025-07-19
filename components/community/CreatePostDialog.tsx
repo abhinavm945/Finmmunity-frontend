@@ -132,7 +132,7 @@ export default function CreatePostDialog({
                 Drag photos and videos here
               </span>
               <span className="mt-3 bg-gradient-to-r from-blue-600 to-purple-600 text-white px-4 py-2 rounded-lg cursor-pointer font-medium">
-                Select from computer
+                Select from your device
                 <input
                   type="file"
                   accept="image/*,video/*"

@@ -60,17 +60,10 @@ const PostCard = ({ post }: PostCardProps) => {
         }
       );
       if (res.data.success) {
-        if (res.data.liked) {
-          setLikes((prev) => [...prev, { userId: user.id }]);
-        } else {
-          setLikes((prev) =>
-            prev.filter((like) =>
-              typeof like === "string"
-                ? like !== user.id
-                : like.userId !== user.id
-            )
-          );
+        if (res.data.likes) {
+          setLikes(res.data.likes);
         }
+        // Update local state - Redux will be updated on next fetch
       }
     } catch (error) {
       console.error("Error toggling like:", error);
@@ -79,7 +72,32 @@ const PostCard = ({ post }: PostCardProps) => {
 
   const handleBookmark = async () => {
     if (!user) return;
-    setIsBookmarked((prev: boolean) => !prev);
+
+    try {
+      const token =
+        typeof window !== "undefined" ? localStorage.getItem("token") : null;
+      const res = await axios.post(
+        `${config.api.baseUrl}/community/posts/${post.id}/bookmark`,
+        {},
+        {
+          headers: {
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          },
+          withCredentials: true,
+        }
+      );
+      if (res.data.success) {
+        setIsBookmarked(!isBookmarked);
+        // You can add toast notification here if you have toast set up
+        console.log(
+          isBookmarked
+            ? "Post removed from bookmarks"
+            : "Post added to bookmarks"
+        );
+      }
+    } catch (error) {
+      console.error("Error toggling bookmark:", error);
+    }
   };
 
   const handleShare = () => {

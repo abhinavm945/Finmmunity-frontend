@@ -32,9 +32,8 @@ export const registerUser = createAsyncThunk(
 export const fetchUserProfile = createAsyncThunk(
   "user/fetchUserProfile",
   async (id, thunkAPI) => {
-    const res = await api.client.get(`/user/${id}/profile`, {
-      withCredentials: true,
-    });
+    const res = await api.client.get(`/users/${id}`);
+    // The backend returns { user: { ... } }
     return res.data.user;
   }
 );
@@ -50,30 +49,25 @@ export const updateUserProfile = createAsyncThunk(
 export const followOrUnfollowUser = createAsyncThunk(
   "user/followOrUnfollowUser",
   async (id, thunkAPI) => {
-    const res = await api.client.post(
-      `/user/followorunfollow/${id}`,
-      {},
-      { withCredentials: true }
-    );
+    const res = await api.client.post(`/community/users/${id}/follow`);
+    // The backend returns { following: true/false }
     return { id, following: res.data.following };
   }
 );
 export const fetchFollowers = createAsyncThunk(
   "user/fetchFollowers",
   async (id, thunkAPI) => {
-    const res = await api.client.get(`/user/${id}/followers`, {
-      withCredentials: true,
-    });
-    return res.data.followers;
+    const res = await api.client.get(`/users/${id}/followers`);
+    // The backend returns { data: [ ... ] } or { followers: [ ... ] }
+    return res.data.data || res.data.followers;
   }
 );
 export const fetchFollowing = createAsyncThunk(
   "user/fetchFollowing",
   async (id, thunkAPI) => {
-    const res = await api.client.get(`/user/${id}/following`, {
-      withCredentials: true,
-    });
-    return res.data.following;
+    const res = await api.client.get(`/users/${id}/following`);
+    // The backend returns { data: [ ... ] } or { following: [ ... ] }
+    return res.data.data || res.data.following;
   }
 );
 export const fetchUserBookmarks = createAsyncThunk(
@@ -92,6 +86,22 @@ export const fetchUserNotifications = createAsyncThunk(
       withCredentials: true,
     });
     return res.data.notifications;
+  }
+);
+
+export const unfollowUser = createAsyncThunk(
+  "user/unfollowUser",
+  async (userId, thunkAPI) => {
+    const res = await api.client.post(`/community/users/${userId}/follow`);
+    return { userId, following: res.data.following };
+  }
+);
+
+export const removeFollower = createAsyncThunk(
+  "user/removeFollower",
+  async (followerId, thunkAPI) => {
+    const res = await api.client.delete(`/users/followers/${followerId}`);
+    return { followerId, removed: res.data.success };
   }
 );
 
@@ -182,6 +192,7 @@ const userSlice = createSlice({
         let profile = action.payload;
         if (profile && profile._id && !profile.id) profile.id = profile._id;
         state.profile = profile;
+        state.error = null; // clear error on success
       })
       .addCase(fetchUserProfile.rejected, (state, action) => {
         state.loading = false;
@@ -203,21 +214,33 @@ const userSlice = createSlice({
       })
       // Follow/Unfollow
       .addCase(followOrUnfollowUser.fulfilled, (state, action) => {
-        if (
-          state.profile &&
-          (state.profile._id === action.payload.id ||
-            state.profile.id === action.payload.id)
-        ) {
+        if (state.profile) {
           state.profile.isFollowing = action.payload.following;
         }
       })
       // Followers
       .addCase(fetchFollowers.fulfilled, (state, action) => {
         state.followers = action.payload;
+        state.error = null; // clear error on success
       })
       // Following
       .addCase(fetchFollowing.fulfilled, (state, action) => {
         state.following = action.payload;
+        state.error = null; // clear error on success
+      })
+      // Unfollow user
+      .addCase(unfollowUser.fulfilled, (state, action) => {
+        // Remove user from following list
+        state.following = state.following.filter(
+          (user) => user.id !== action.payload.userId
+        );
+      })
+      // Remove follower
+      .addCase(removeFollower.fulfilled, (state, action) => {
+        // Remove user from followers list
+        state.followers = state.followers.filter(
+          (user) => user.id !== action.payload.followerId
+        );
       })
       // Bookmarks
       .addCase(fetchUserBookmarks.fulfilled, (state, action) => {

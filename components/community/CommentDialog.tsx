@@ -22,7 +22,11 @@ const CommentDialog = ({ open, setOpen, post }) => {
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const dialogRef = useRef(null);
   const emojiPickerRef = useRef(null);
-  const [liked, setLiked] = useState(post?.likes?.includes(user?._id) || false);
+  const [liked, setLiked] = useState(
+    post?.likes?.some((like) =>
+      typeof like === "string" ? like === user?.id : like.userId === user?.id
+    ) || false
+  );
   const [isBookmark, setIsBookmark] = useState(
     userProfile?.bookmarks?.some((bookmark) => bookmark?._id === post?._id) ||
       false
@@ -61,8 +65,16 @@ const CommentDialog = ({ open, setOpen, post }) => {
   useEffect(() => {
     if (post) {
       setComment(post?.comments);
+      // Update like state when post changes
+      setLiked(
+        post?.likes?.some((like) =>
+          typeof like === "string"
+            ? like === user?.id
+            : like.userId === user?.id
+        ) || false
+      );
     }
-  }, [post]);
+  }, [post, user?.id]);
 
   useEffect(() => {
     console.log("Comments in CommentDialog:", comment);
@@ -81,36 +93,52 @@ const CommentDialog = ({ open, setOpen, post }) => {
   const LikeOrDisLikeHandler = async () => {
     if (!user) return toast.error("You need to be logged in to like posts.");
     try {
-      const action = liked ? "dislike" : "like";
+      const token =
+        typeof window !== "undefined" ? localStorage.getItem("token") : null;
       const res = await axios.post(
-        `${config.api.baseUrl}/post/${post.id}/${action}`,
+        `${config.api.baseUrl}/community/posts/${post.id}/like`,
         {},
-        { withCredentials: true }
+        {
+          headers: {
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          },
+          withCredentials: true,
+        }
       );
       if (res.data.success) {
         setLiked(!liked);
-        // Update posts in Redux if needed
+        // Update local state - Redux will be updated on next fetch
+        toast.success(liked ? "Post unliked" : "Post liked");
       }
     } catch (error) {
       toast.error("Failed to update like status. Try again.");
-      console.log(error);
+      console.error("Error toggling like:", error);
     }
   };
 
   const bookmarkHandler = async () => {
     try {
-      const res = await axios.get(
-        `${config.api.baseUrl}/post/${post?.id}/bookmark`,
+      const token =
+        typeof window !== "undefined" ? localStorage.getItem("token") : null;
+      const res = await axios.post(
+        `${config.api.baseUrl}/community/posts/${post?.id}/bookmark`,
+        {},
         {
+          headers: {
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          },
           withCredentials: true,
         }
       );
       if (res.data.success) {
-        toast.success(res.data.message);
-        setIsBookmark(res.data.type !== "unsaved");
+        setIsBookmark(!isBookmark);
+        toast.success(
+          isBookmark ? "Post removed from bookmarks" : "Post added to bookmarks"
+        );
       }
     } catch (error) {
-      console.log(error);
+      toast.error("Failed to update bookmark status. Try again.");
+      console.error("Error toggling bookmark:", error);
     }
   };
 
@@ -243,7 +271,15 @@ const CommentDialog = ({ open, setOpen, post }) => {
                   />
                 )}
                 <MessageCircle className="cursor-pointer hover:text-gray-600" />
-                <Send className="cursor-pointer hover:text-gray-600" />
+                <Send
+                  className="cursor-pointer hover:text-gray-600"
+                  onClick={() => {
+                    navigator.clipboard.writeText(
+                      `${window.location.origin}/community/post/${post.id}`
+                    );
+                    toast.success("Post link copied to clipboard!");
+                  }}
+                />
               </div>
               {isBookmark ? (
                 <BookmarkCheck
