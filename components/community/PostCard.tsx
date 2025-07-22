@@ -1,6 +1,6 @@
 /* eslint-disable react/prop-types */
 import { useState, useEffect } from "react";
-import { useSelector } from "react-redux";
+import { useSelector, useDispatch } from "react-redux";
 import { Bookmark, BookmarkCheck, MessageCircle, Send } from "lucide-react";
 import { FaHeart, FaRegHeart } from "react-icons/fa";
 import Avatar from "../shared/Avatar";
@@ -10,29 +10,39 @@ import Image from "next/image";
 import { Post, User } from "../../utils/types";
 import axios from "axios";
 import { config } from "../../utils/config";
+import { updatePostLocally } from "../../redux/communitySlice";
+import { toast } from "react-toastify";
 
 interface PostCardProps {
   post: Post;
 }
 
 const PostCard = ({ post }: PostCardProps) => {
+  const dispatch = useDispatch();
+  // Always get the latest post from Redux by id
+  const postFromRedux = useSelector((state: any) =>
+    state.community.posts.find((p: any) => p.id === post.id)
+  );
+  const currentPost = postFromRedux || post;
+
   const user = useSelector(
     (state: { user: { user: User } }) => state.user?.user
   );
 
   // Use author info from post.user
-  const author: { profilePicture?: string; username: string } = post.user;
+  const author: { profilePicture?: string; username: string } =
+    currentPost.user;
 
-  const [isBookmarked, setIsBookmarked] = useState(post.isBookmarked || false);
+  const [isBookmarked, setIsBookmarked] = useState(
+    currentPost.isBookmarked || false
+  );
   const [showComments, setShowComments] = useState(false);
   const [text, setText] = useState("");
-  // Change the likes state type to (string | { userId: string })[]
-  const [likes, setLikes] = useState<(string | { userId: string })[]>(
-    post.likes
-  );
+  const [isCommenting, setIsCommenting] = useState(false);
+
   const liked =
     !!user &&
-    likes.some((like) =>
+    currentPost.likes.some((like: any) =>
       typeof like === "string" ? like === user.id : like.userId === user.id
     );
 
@@ -40,8 +50,37 @@ const PostCard = ({ post }: PostCardProps) => {
     setText(e.target.value);
   };
 
-  const commentHandler = () => {
-    setText("");
+  const commentHandler = async () => {
+    if (!text.trim()) return toast.warning("Comment cannot be empty.");
+    if (!user) return toast.error("You must be logged in to comment.");
+    if (isCommenting) return;
+    setIsCommenting(true);
+    try {
+      const token =
+        typeof window !== "undefined" ? localStorage.getItem("token") : null;
+      const res = await axios.post(
+        `${config.api.baseUrl}/community/comments`,
+        { postId: currentPost.id, content: text },
+        {
+          headers: {
+            "Content-Type": "application/json",
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          },
+          withCredentials: true,
+        }
+      );
+      if (res.data.success && res.data.comment && res.data.post) {
+        dispatch(updatePostLocally(res.data.post));
+        setText("");
+      } else {
+        toast.error("Failed to post comment.");
+      }
+    } catch (error) {
+      toast.error("An error occurred while posting the comment.");
+      console.log(error);
+    } finally {
+      setIsCommenting(false);
+    }
   };
 
   const handleLike = async () => {
@@ -50,7 +89,7 @@ const PostCard = ({ post }: PostCardProps) => {
       typeof window !== "undefined" ? localStorage.getItem("token") : null;
     try {
       const res = await axios.post(
-        `${config.api.baseUrl}/community/posts/${post.id}/like`,
+        `${config.api.baseUrl}/community/posts/${currentPost.id}/like`,
         {},
         {
           headers: {
@@ -59,11 +98,8 @@ const PostCard = ({ post }: PostCardProps) => {
           withCredentials: true,
         }
       );
-      if (res.data.success) {
-        if (res.data.likes) {
-          setLikes(res.data.likes);
-        }
-        // Update local state - Redux will be updated on next fetch
+      if (res.data.success && res.data.post) {
+        dispatch(updatePostLocally(res.data.post));
       }
     } catch (error) {
       console.error("Error toggling like:", error);
@@ -77,7 +113,7 @@ const PostCard = ({ post }: PostCardProps) => {
       const token =
         typeof window !== "undefined" ? localStorage.getItem("token") : null;
       const res = await axios.post(
-        `${config.api.baseUrl}/community/posts/${post.id}/bookmark`,
+        `${config.api.baseUrl}/community/posts/${currentPost.id}/bookmark`,
         {},
         {
           headers: {
@@ -101,11 +137,13 @@ const PostCard = ({ post }: PostCardProps) => {
   };
 
   const handleShare = () => {
-    navigator.clipboard.writeText(window.location.href + `/post/${post.id}`);
+    navigator.clipboard.writeText(
+      window.location.href + `/post/${currentPost.id}`
+    );
   };
 
   const handleShowComments = () => {
-    console.log("Post passed to CommentDialog:", post);
+    console.log("Post passed to CommentDialog:", currentPost);
     setShowComments(true);
   };
 
@@ -126,16 +164,18 @@ const PostCard = ({ post }: PostCardProps) => {
           <span className="font-medium text-gray-700">{author.username}</span>
         </div>
         <span className="text-xs text-gray-400">
-          {post.createdAt ? new Date(post.createdAt).toLocaleString() : ""}
+          {currentPost.createdAt
+            ? new Date(currentPost.createdAt).toLocaleString()
+            : ""}
         </span>
       </div>
 
       {/* Post Image */}
-      {post.image && (
+      {currentPost.image && (
         <div className="w-full rounded-xl overflow-hidden mb-4">
           <Image
-            src={post.image || "/images/placeholder-post.jpg"}
-            alt={post.content || "Post image"}
+            src={currentPost.image || "/images/placeholder-post.jpg"}
+            alt={currentPost.content || "Post image"}
             width={900}
             height={500}
             className="w-full h-auto object-contain max-h-[400px] bg-gray-50"
@@ -148,7 +188,7 @@ const PostCard = ({ post }: PostCardProps) => {
       {/* Post Caption (Content) */}
       <p className="text-base sm:text-lg text-gray-800 mb-2 break-words leading-relaxed">
         <span className="font-semibold mr-2">{author.username}</span>
-        {post.content}
+        {currentPost.content}
       </p>
 
       {/* Post Actions */}
@@ -191,13 +231,13 @@ const PostCard = ({ post }: PostCardProps) => {
 
       {/* Likes and Comments Count */}
       <div className="my-2 flex flex-wrap gap-4 text-sm text-gray-600">
-        <span className="font-medium">{likes.length} likes</span>
-        {post.comments?.length > 0 && (
+        <span className="font-medium">{currentPost.likes.length} likes</span>
+        {currentPost.comments?.length > 0 && (
           <span
             className="cursor-pointer hover:underline"
             onClick={() => setShowComments(true)}
           >
-            View all {post.comments.length} comments
+            View all {currentPost.comments.length} comments
           </span>
         )}
       </div>
@@ -206,7 +246,7 @@ const PostCard = ({ post }: PostCardProps) => {
       <CommentDialog
         open={showComments}
         setOpen={setShowComments}
-        post={post}
+        post={currentPost}
       />
 
       {/* Add Comment */}
@@ -220,8 +260,12 @@ const PostCard = ({ post }: PostCardProps) => {
         />
         {text && (
           <span
-            onClick={commentHandler}
-            className="text-[#3badf8] cursor-pointer ml-2 font-semibold"
+            onClick={!text.trim() || isCommenting ? undefined : commentHandler}
+            className={`text-[#3badf8] cursor-pointer ml-2 font-semibold ${
+              !text.trim() || isCommenting
+                ? "opacity-50 pointer-events-none"
+                : ""
+            }`}
           >
             Post
           </span>

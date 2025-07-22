@@ -251,10 +251,6 @@ export default function TrendingPage() {
             </AnimatePresence>
           )}
         </div>
-        {/* Right Sidebar: Who to follow */}
-        <div className="hidden lg:block w-80 flex-shrink-0">
-          <RightSidebar />
-        </div>
       </div>
       {/* Comment Modal */}
       <AnimatePresence>

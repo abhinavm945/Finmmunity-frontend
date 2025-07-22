@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useSelector } from "react-redux";
+import { useSelector, useDispatch } from "react-redux";
 import { Bookmark, BookmarkCheck, MessageCircle, Send } from "lucide-react";
 import { FaHeart, FaRegHeart } from "react-icons/fa";
 import Avatar from "../shared/Avatar";
@@ -14,28 +14,37 @@ import Image from "next/image";
 import { User } from "../../utils/types";
 import axios from "axios";
 import { config } from "../../utils/config";
+import { updateBlogLocally } from "../../redux/communitySlice";
+import { toast } from "react-toastify";
 
 interface BlogCardProps {
   blog: Blog;
 }
 
 export default function BlogCard({ blog }: BlogCardProps) {
-  console.log("BlogCard received blog:", blog);
+  const dispatch = useDispatch();
+  // Always get the latest blog from Redux by id
+  const blogFromRedux = useSelector((state: any) =>
+    state.community.blogs.find((b: any) => b.id === blog.id)
+  );
+  const currentBlog = blogFromRedux || blog;
+
+  // Debug log for comments
 
   const user = useSelector(
     (state: { user: { user: User } }) => state.user?.user
   );
 
-  const [isBookmarked, setIsBookmarked] = useState(blog.isBookmarked || false);
+  const [isBookmarked, setIsBookmarked] = useState(
+    currentBlog.isBookmarked || false
+  );
   const [showComments, setShowComments] = useState(false);
   const [text, setText] = useState("");
-  // Change the likes state type to (string | { userId: string })[]
-  const [likes, setLikes] = useState<(string | { userId: string })[]>(
-    blog.likes
-  );
+  const [isCommenting, setIsCommenting] = useState(false);
+
   const liked =
     !!user &&
-    likes.some((like) =>
+    currentBlog.likes.some((like: any) =>
       typeof like === "string" ? like === user.id : like.userId === user.id
     );
 
@@ -43,13 +52,42 @@ export default function BlogCard({ blog }: BlogCardProps) {
     setText(e.target.value);
   };
 
-  const commentHandler = () => {
-    // Implement comment submission logic here
-    setText("");
+  const commentHandler = async () => {
+    if (!text.trim()) return toast.warning("Comment cannot be empty.");
+    if (!user) return toast.error("You must be logged in to comment.");
+    if (isCommenting) return;
+    setIsCommenting(true);
+    try {
+      const token =
+        typeof window !== "undefined" ? localStorage.getItem("token") : null;
+      const res = await axios.post(
+        `${config.api.baseUrl}/community/comments`,
+        { blogId: currentBlog.id, content: text },
+        {
+          headers: {
+            "Content-Type": "application/json",
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          },
+          withCredentials: true,
+        }
+      );
+      if (res.data.success && res.data.comment && res.data.blog) {
+        dispatch(updateBlogLocally(res.data.blog));
+        setText("");
+      } else {
+        toast.error("Failed to post comment.");
+      }
+    } catch (error) {
+      toast.error("An error occurred while posting the comment.");
+      console.log(error);
+    } finally {
+      setIsCommenting(false);
+    }
   };
 
   // Use author info from blog.user
-  const author: { profilePicture?: string; username: string } = blog.user;
+  const author: { profilePicture?: string; username: string } =
+    currentBlog.user;
 
   const handleLike = async () => {
     if (!user) return;
@@ -57,7 +95,7 @@ export default function BlogCard({ blog }: BlogCardProps) {
       typeof window !== "undefined" ? localStorage.getItem("token") : null;
     try {
       const res = await axios.post(
-        `${config.api.baseUrl}/community/blogs/${blog.id}/like`,
+        `${config.api.baseUrl}/community/blogs/${currentBlog.id}/like`,
         {},
         {
           headers: {
@@ -66,11 +104,8 @@ export default function BlogCard({ blog }: BlogCardProps) {
           withCredentials: true,
         }
       );
-      if (res.data.success) {
-        if (res.data.likes) {
-          setLikes(res.data.likes);
-        }
-        // Update local state - Redux will be updated on next fetch
+      if (res.data.success && res.data.blog) {
+        dispatch(updateBlogLocally(res.data.blog));
       }
     } catch (error) {
       console.error("Error toggling like:", error);
@@ -84,7 +119,7 @@ export default function BlogCard({ blog }: BlogCardProps) {
       const token =
         typeof window !== "undefined" ? localStorage.getItem("token") : null;
       const res = await axios.post(
-        `${config.api.baseUrl}/community/blogs/${blog.id}/bookmark`,
+        `${config.api.baseUrl}/community/blogs/${currentBlog.id}/bookmark`,
         {},
         {
           headers: {
@@ -96,7 +131,11 @@ export default function BlogCard({ blog }: BlogCardProps) {
       if (res.data.success) {
         setIsBookmarked(!isBookmarked);
         // You can add toast notification here if you have toast set up
-        console.log(isBookmarked ? "Blog removed from bookmarks" : "Blog added to bookmarks");
+        console.log(
+          isBookmarked
+            ? "Blog removed from bookmarks"
+            : "Blog added to bookmarks"
+        );
       }
     } catch (error) {
       console.error("Error toggling bookmark:", error);
@@ -104,7 +143,9 @@ export default function BlogCard({ blog }: BlogCardProps) {
   };
 
   const handleShare = () => {
-    navigator.clipboard.writeText(window.location.href + `/blog/${blog.id}`);
+    navigator.clipboard.writeText(
+      window.location.href + `/blog/${currentBlog.id}`
+    );
     alert("Link copied to clipboard!");
   };
 
@@ -117,7 +158,7 @@ export default function BlogCard({ blog }: BlogCardProps) {
     >
       {/* Blog Title */}
       <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-2 group-hover:text-blue-600 transition-colors duration-200">
-        {blog.title}
+        {currentBlog.title}
       </h2>
 
       {/* Blog Author and Date */}
@@ -130,21 +171,25 @@ export default function BlogCard({ blog }: BlogCardProps) {
           <span className="font-medium text-gray-700">{author.username}</span>
         </div>
         <span className="text-xs text-gray-400">
-          {formatDate(blog.createdAt)}
+          {formatDate(currentBlog.createdAt)}
         </span>
       </div>
 
       {/* Blog Content/Description */}
       <p className="text-base sm:text-lg text-gray-800 mb-4 break-words leading-relaxed">
-        {blog.content}
+        {currentBlog.content}
       </p>
 
       {/* Blog Image or GIF */}
-      {(blog.gifUrl || blog.image) && (
+      {(currentBlog.gifUrl || currentBlog.image) && (
         <div className="w-full rounded-xl overflow-hidden mb-4">
           <Image
-            src={blog.gifUrl || blog.image || "/images/placeholder-post.jpg"}
-            alt={blog.title}
+            src={
+              currentBlog.gifUrl ||
+              currentBlog.image ||
+              "/images/placeholder-post.jpg"
+            }
+            alt={currentBlog.title}
             width={900}
             height={500}
             className="w-full h-auto object-contain max-h-[400px] bg-gray-50"
@@ -194,13 +239,13 @@ export default function BlogCard({ blog }: BlogCardProps) {
 
       {/* Likes and Comments Count */}
       <div className="my-2 flex flex-wrap gap-4 text-sm text-gray-600">
-        <span className="font-medium">{likes.length} likes</span>
-        {blog.comments.length > 0 && (
+        <span className="font-medium">{currentBlog.likes.length} likes</span>
+        {currentBlog.comments.length > 0 && (
           <span
             className="cursor-pointer hover:underline"
             onClick={() => setShowComments(true)}
           >
-            View all {blog.comments.length} comments
+            View all {currentBlog.comments.length} comments
           </span>
         )}
       </div>
@@ -210,7 +255,7 @@ export default function BlogCard({ blog }: BlogCardProps) {
         <BlogCommentDialog
           open={showComments}
           setOpen={setShowComments}
-          blog={blog}
+          blog={currentBlog}
         />
       )}
 
@@ -225,8 +270,12 @@ export default function BlogCard({ blog }: BlogCardProps) {
         />
         {text && (
           <span
-            onClick={commentHandler}
-            className="text-[#3badf8] cursor-pointer ml-2 font-semibold"
+            onClick={!text.trim() || isCommenting ? undefined : commentHandler}
+            className={`text-[#3badf8] cursor-pointer ml-2 font-semibold ${
+              !text.trim() || isCommenting
+                ? "opacity-50 pointer-events-none"
+                : ""
+            }`}
           >
             Post
           </span>

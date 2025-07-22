@@ -367,6 +367,20 @@ const communitySlice = createSlice({
     clearSearchResults(state) {
       state.searchResults = [];
     },
+    updateBlogLocally(state, action) {
+      const updatedBlog = action.payload;
+      const idx = state.blogs.findIndex((b) => b.id === updatedBlog.id);
+      if (idx !== -1) {
+        state.blogs[idx] = updatedBlog;
+      }
+    },
+    updatePostLocally(state, action) {
+      const updatedPost = action.payload;
+      const idx = state.posts.findIndex((p) => p.id === updatedPost.id);
+      if (idx !== -1) {
+        state.posts[idx] = updatedPost;
+      }
+    },
   },
   extraReducers: (builder) => {
     // Blogs
@@ -584,4 +598,6 @@ export const {
   clearCommunityError,
   clearCommunityLoading,
   clearSearchResults,
+  updateBlogLocally,
+  updatePostLocally,
 } = communitySlice.actions;

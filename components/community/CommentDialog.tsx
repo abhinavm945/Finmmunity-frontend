@@ -6,30 +6,38 @@ import PostDialog from "./PostDialog";
 import { GoSmiley } from "react-icons/go";
 import EmojiPicker from "emoji-picker-react";
 import { useDispatch, useSelector } from "react-redux";
+import { updatePostLocally } from "../../redux/communitySlice";
 import axios from "axios";
 import { toast } from "react-toastify";
 import { Bookmark, BookmarkCheck, MessageCircle, Send } from "lucide-react";
 import { FaHeart, FaRegHeart } from "react-icons/fa";
 import { config } from "../../utils/config";
 
-const CommentDialog = ({ open, setOpen, post }) => {
+const CommentDialog = ({ open, setOpen, post }: any) => {
   const [text, setText] = useState("");
   const dispatch = useDispatch();
-  const posts = useSelector((store) => store.community.posts);
-  const user = useSelector((store) => store.user.user);
-  const userProfile = useSelector((store) => store.user.profile);
-  const [comment, setComment] = useState(post?.comments || []);
+  // Always get the latest post from Redux by id
+  const postFromRedux = useSelector((state: any) =>
+    state.community.posts.find((p: any) => p.id === post.id)
+  );
+  const currentPost = postFromRedux || post;
+
+  const user = useSelector((state: any) => state.user.user);
+  const userProfile = useSelector((state: any) => state.user.profile);
+
+  const [comment, setComment] = useState(currentPost?.comments || []);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const dialogRef = useRef(null);
   const emojiPickerRef = useRef(null);
   const [liked, setLiked] = useState(
-    post?.likes?.some((like) =>
+    currentPost?.likes?.some((like: any) =>
       typeof like === "string" ? like === user?.id : like.userId === user?.id
     ) || false
   );
   const [isBookmark, setIsBookmark] = useState(
-    userProfile?.bookmarks?.some((bookmark) => bookmark?._id === post?._id) ||
-      false
+    userProfile?.bookmarks?.some(
+      (bookmark: any) => bookmark?._id === currentPost?._id
+    ) || false
   );
 
   useEffect(() => {
@@ -63,18 +71,17 @@ const CommentDialog = ({ open, setOpen, post }) => {
   }, []);
 
   useEffect(() => {
-    if (post) {
-      setComment(post?.comments);
-      // Update like state when post changes
+    if (currentPost) {
+      setComment(currentPost?.comments);
       setLiked(
-        post?.likes?.some((like) =>
+        currentPost?.likes?.some((like: any) =>
           typeof like === "string"
             ? like === user?.id
             : like.userId === user?.id
         ) || false
       );
     }
-  }, [post, user?.id]);
+  }, [currentPost, user?.id]);
 
   useEffect(() => {
     console.log("Comments in CommentDialog:", comment);
@@ -90,13 +97,14 @@ const CommentDialog = ({ open, setOpen, post }) => {
     setText((prevText) => prevText + emoji.emoji);
   };
 
+  // Like handler
   const LikeOrDisLikeHandler = async () => {
     if (!user) return toast.error("You need to be logged in to like posts.");
     try {
       const token =
         typeof window !== "undefined" ? localStorage.getItem("token") : null;
       const res = await axios.post(
-        `${config.api.baseUrl}/community/posts/${post.id}/like`,
+        `${config.api.baseUrl}/community/posts/${currentPost.id}/like`,
         {},
         {
           headers: {
@@ -105,9 +113,9 @@ const CommentDialog = ({ open, setOpen, post }) => {
           withCredentials: true,
         }
       );
-      if (res.data.success) {
+      if (res.data.success && res.data.post) {
         setLiked(!liked);
-        // Update local state - Redux will be updated on next fetch
+        dispatch(updatePostLocally(res.data.post));
         toast.success(liked ? "Post unliked" : "Post liked");
       }
     } catch (error) {
@@ -142,6 +150,7 @@ const CommentDialog = ({ open, setOpen, post }) => {
     }
   };
 
+  // Comment handler
   const commentHandler = async () => {
     if (!text.trim()) return toast.warning("Comment cannot be empty.");
     if (!user) return toast.error("You must be logged in to comment.");
@@ -150,7 +159,7 @@ const CommentDialog = ({ open, setOpen, post }) => {
         typeof window !== "undefined" ? localStorage.getItem("token") : null;
       const res = await axios.post(
         `${config.api.baseUrl}/community/comments`,
-        { postId: post.id, content: text },
+        { postId: currentPost.id, content: text },
         {
           headers: {
             "Content-Type": "application/json",
@@ -159,9 +168,10 @@ const CommentDialog = ({ open, setOpen, post }) => {
           withCredentials: true,
         }
       );
-      if (res.data.success && res.data.comment) {
-        setComment((prev) => [res.data.comment, ...prev]);
+      if (res.data.success && res.data.comment && res.data.post) {
+        setComment((prev: any) => [res.data.comment, ...prev]);
         setText("");
+        dispatch(updatePostLocally(res.data.post));
       } else {
         toast.error("Failed to post comment.");
       }
@@ -294,7 +304,7 @@ const CommentDialog = ({ open, setOpen, post }) => {
               )}
             </div>
             <span className="font-medium block px-4 pb-2">
-              {post?.likes.length} likes
+              {currentPost?.likes.length} likes
             </span>
             <div className="p-3 border-t border-gray-300">
               <div className="relative flex items-center gap-3">

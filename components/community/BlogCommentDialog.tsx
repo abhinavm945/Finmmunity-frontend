@@ -12,6 +12,7 @@ import { Bookmark, BookmarkCheck, MessageCircle, Send } from "lucide-react";
 import { FaHeart, FaRegHeart } from "react-icons/fa";
 import BlogDialog from "./BlogDialog";
 import { config } from "../../utils/config";
+import { updateBlogLocally } from "../../redux/communitySlice";
 
 // Add types for props
 interface BlogCommentDialogProps {
@@ -35,17 +36,24 @@ const BlogCommentDialog = ({ open, setOpen, blog }: BlogCommentDialogProps) => {
   const emojiPickerRef = useRef(null);
   const author = blog?.author;
 
+  // Always get the latest blog from Redux by id
+  const blogFromRedux = useSelector((state: any) =>
+    state.community.blogs.find((b: any) => b.id === blog.id)
+  );
+  const currentBlog = blogFromRedux || blog;
+
   // Like state
   const [liked, setLiked] = useState(
-    blog?.likes?.some((like) =>
+    currentBlog?.likes?.some((like) =>
       typeof like === "string" ? like === user?.id : like.userId === user?.id
     ) || false
   );
 
   // Bookmark state
   const [isBookmark, setIsBookmark] = useState(
-    userProfile?.bookmarks?.some((bookmark) => bookmark?._id === blog?._id) ||
-      false
+    userProfile?.bookmarks?.some(
+      (bookmark) => bookmark?._id === currentBlog?._id
+    ) || false
   );
 
   useEffect(() => {
@@ -68,18 +76,18 @@ const BlogCommentDialog = ({ open, setOpen, blog }: BlogCommentDialogProps) => {
   }, [open, setOpen]);
 
   useEffect(() => {
-    if (blog) {
-      setComments(blog?.comments);
+    if (currentBlog) {
+      setComments(currentBlog?.comments);
       // Update like state when blog changes
       setLiked(
-        blog?.likes?.some((like) =>
+        currentBlog?.likes?.some((like) =>
           typeof like === "string"
             ? like === user?.id
             : like.userId === user?.id
         ) || false
       );
     }
-  }, [blog, user?.id]);
+  }, [currentBlog, user?.id]);
 
   if (!open) return null;
 
@@ -97,7 +105,7 @@ const BlogCommentDialog = ({ open, setOpen, blog }: BlogCommentDialogProps) => {
       const token =
         typeof window !== "undefined" ? localStorage.getItem("token") : null;
       const res = await axios.post(
-        `${config.api.baseUrl}/community/blogs/${blog.id}/like`,
+        `${config.api.baseUrl}/community/blogs/${currentBlog.id}/like`,
         {},
         {
           headers: {
@@ -106,9 +114,9 @@ const BlogCommentDialog = ({ open, setOpen, blog }: BlogCommentDialogProps) => {
           withCredentials: true,
         }
       );
-      if (res.data.success) {
+      if (res.data.success && res.data.blog) {
         setLiked(!liked);
-        // Update local state - Redux will be updated on next fetch
+        dispatch(updateBlogLocally(res.data.blog));
         toast.success(liked ? "Blog unliked" : "Blog liked");
       }
     } catch (error) {
@@ -122,7 +130,7 @@ const BlogCommentDialog = ({ open, setOpen, blog }: BlogCommentDialogProps) => {
       const token =
         typeof window !== "undefined" ? localStorage.getItem("token") : null;
       const res = await axios.post(
-        `${config.api.baseUrl}/community/blogs/${blog?.id}/bookmark`,
+        `${config.api.baseUrl}/community/blogs/${currentBlog?.id}/bookmark`,
         {},
         {
           headers: {
@@ -152,7 +160,7 @@ const BlogCommentDialog = ({ open, setOpen, blog }: BlogCommentDialogProps) => {
         typeof window !== "undefined" ? localStorage.getItem("token") : null;
       const res = await axios.post(
         `${config.api.baseUrl}/community/comments`,
-        { blogId: blog.id, content: text },
+        { blogId: currentBlog.id, content: text },
         {
           headers: {
             "Content-Type": "application/json",
@@ -162,9 +170,10 @@ const BlogCommentDialog = ({ open, setOpen, blog }: BlogCommentDialogProps) => {
         }
       );
 
-      if (res.data.success && res.data.comment) {
+      if (res.data.success && res.data.comment && res.data.blog) {
         setComments((prev) => [res.data.comment, ...prev]);
         setText("");
+        dispatch(updateBlogLocally(res.data.blog));
       } else {
         toast.error("Failed to Blog comment.");
       }
@@ -203,43 +212,43 @@ const BlogCommentDialog = ({ open, setOpen, blog }: BlogCommentDialogProps) => {
         <div className="p-4 flex flex-col gap-4 custom-scrollbar pt-14 md:pt-0">
           {/* Author Info */}
           <div className="flex items-center gap-3">
-            <Link href={`/profile/${blog.userId}`}>
-              <Avatar size="md" image={blog.profilePicture || ""} />
+            <Link href={`/profile/${currentBlog.userId}`}>
+              <Avatar size="md" image={currentBlog.profilePicture || ""} />
             </Link>
             <div>
               <Link
-                href={`/profile/${blog.userId}`}
+                href={`/profile/${currentBlog.userId}`}
                 className="font-semibold text-lg hover:underline"
               >
-                {blog.username || "Unknown"}
+                {currentBlog.username || "Unknown"}
               </Link>
               <p className="text-sm text-gray-500">
-                {new Date(blog?.createdAt).toLocaleString()}
+                {new Date(currentBlog?.createdAt).toLocaleString()}
               </p>
             </div>
             <div>
-              <BlogDialog blog={blog} />
+              <BlogDialog blog={currentBlog} />
             </div>
           </div>
 
           {/* Blog Title & Description */}
-          <h2 className="text-xl font-bold">{blog.title}</h2>
+          <h2 className="text-xl font-bold">{currentBlog.title}</h2>
           <div className="text-gray-700 text-sm">
-            {parse(blog.content || "")}
+            {parse(currentBlog.content || "")}
           </div>
 
           {/* Blog Image / GIF */}
-          {blog?.image && (
+          {currentBlog?.image && (
             <img
               className="max-w-lg max-h-96 object-contain rounded-lg"
-              src={blog?.image}
+              src={currentBlog?.image}
               alt="Blog"
             />
           )}
-          {blog?.gifUrl && (
+          {currentBlog?.gifUrl && (
             <img
               className="max-w-lg max-h-96 object-contain rounded-lg"
-              src={blog?.gifUrl}
+              src={currentBlog?.gifUrl}
               alt="GIF"
             />
           )}
@@ -266,7 +275,7 @@ const BlogCommentDialog = ({ open, setOpen, blog }: BlogCommentDialogProps) => {
                 className="cursor-pointer hover:text-gray-600"
                 onClick={() => {
                   navigator.clipboard.writeText(
-                    `${window.location.origin}/community/blog/${blog.id}`
+                    `${window.location.origin}/community/blog/${currentBlog.id}`
                   );
                   toast.success("Blog link copied to clipboard!");
                 }}
@@ -286,7 +295,9 @@ const BlogCommentDialog = ({ open, setOpen, blog }: BlogCommentDialogProps) => {
           </div>
 
           {/* Likes Count */}
-          <span className="font-medium block">{blog?.likes?.length} likes</span>
+          <span className="font-medium block">
+            {currentBlog?.likes?.length} likes
+          </span>
         </div>
 
         <hr />

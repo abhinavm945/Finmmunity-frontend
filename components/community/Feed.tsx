@@ -4,9 +4,9 @@ import { useState } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import PostList from "./PostList";
 import BlogList from "./BlogList";
-import PostCard from "./PostCard";
-import BlogCard from "./BlogCard";
 import { useSelector } from "react-redux";
+import type { RootState } from "../../redux/store";
+import type { User, Post, Blog } from "../../utils/types";
 
 interface FeedProps {
   userId?: string;
@@ -18,14 +18,31 @@ export default function Feed({ userId }: FeedProps) {
   const urlTab = searchParams.get("tab");
 
   const [activeTab, setActiveTab] = useState(urlTab || "Blogs");
-  const blogs = useSelector((state) => state.community.blogs);
-  const posts = useSelector((state) => state.community.posts);
+  const blogs = useSelector(
+    (state: RootState) => state.community.blogs
+  ) as Blog[];
+  const posts = useSelector(
+    (state: RootState) => state.community.posts
+  ) as Post[];
+  const following = useSelector(
+    (state: RootState) => state.user.following
+  ) as User[];
+  const currentUser = useSelector(
+    (state: RootState) => state.user.user
+  ) as User | null;
 
-  // Get bookmarked items for Watchlist (this would need to be fetched from backend)
-  const bookmarkedItems = [
-    { id: 1, title: "Bitcoin Analysis", type: "blog" },
-    { id: 2, title: "Market Update", type: "post" },
-  ];
+  // Strictly filter: only show posts/blogs from users I follow, and not my own
+  const followingIds = following?.map((u) => u.id) || [];
+  const myId = currentUser?.id;
+
+  const filteredPosts = posts.filter(
+    (post) =>
+      post.user && followingIds.includes(post.user.id) && post.user.id !== myId
+  );
+  const filteredBlogs = blogs.filter(
+    (blog) =>
+      blog.user && followingIds.includes(blog.user.id) && blog.user.id !== myId
+  );
 
   // Update URL parameters when tab changes
   const handleTabChange = (tab: string) => {
@@ -43,7 +60,7 @@ export default function Feed({ userId }: FeedProps) {
   return (
     <>
       <div className="flex items-center justify-center gap-8 text-sm border-b">
-        {["Blogs", "Posts", "Watchlist"].map((tab) => (
+        {["Blogs", "Posts", "Premium"].map((tab) => (
           <button
             key={tab}
             className={`py-4 px-2 font-medium ${
@@ -59,13 +76,13 @@ export default function Feed({ userId }: FeedProps) {
       </div>
       <div className="my-4">
         {activeTab === "Posts" ? (
-          <PostList posts={posts} />
+          <PostList posts={filteredPosts} />
         ) : activeTab === "Blogs" ? (
-          <BlogList blogs={blogs} />
+          <BlogList blogs={filteredBlogs} />
         ) : (
           <div className="space-y-4 max-w-7xl mx-auto">
             <p className="text-center text-gray-500">
-              Watchlist feature coming soon.
+              Premium feature coming soon.
             </p>
           </div>
         )}
